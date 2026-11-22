@@ -152,7 +152,7 @@ public partial class VulcanWindow
 
         if (filteredProjects.Count == 0)
         {
-            M3Text.Draw("No workshop projects match your search.", M3TextStyle.Faint, true);
+            M3Text.Draw("没有匹配搜索条件的工房工程。", M3TextStyle.Faint, true);
             return;
         }
 
@@ -174,11 +174,11 @@ public partial class VulcanWindow
     {
         if (_selectedWorkshopProject == null)
         {
-            M3Text.Draw("Pick a workshop project to browse its parts.", M3TextStyle.Faint, true);
+            M3Text.Draw("选择一个工房工程查看各部件。", M3TextStyle.Faint, true);
             return;
         }
 
-        M3Widgets.SectionLabel("Project scope");
+        M3Widgets.SectionLabel("工程范围");
         M3Text.Draw(_selectedWorkshopProject.ProjectName, M3TextStyle.Muted, true);
         ImGui.Dummy(new Vector2(0, M3.Space1));
 
@@ -249,7 +249,7 @@ public partial class VulcanWindow
     {
         if (_selectedWorkshopScope == null)
         {
-            M3Widgets.EmptyState("##noWorkshopScope", "Nothing selected", "Pick a project, part or phase to see what it needs. The list it makes uses Vulcan's normal planner.",
+            M3Widgets.EmptyState("##noWorkshopScope", "未选择工程范围", "选择工程、部件或阶段查看需求。制作清单使用 Vulcan 的常规规划器。",
                 FontAwesomeIcon.Industry);
             return;
         }
@@ -285,7 +285,7 @@ public partial class VulcanWindow
         }
 
         ImGui.Dummy(new Vector2(0, M3.Space2));
-        using (M3Card.Begin("##workshopSummary", "Summary", FontAwesomeIcon.ClipboardList, M3.AccentFor(0)))
+        using (M3Card.Begin("##workshopSummary", "摘要", FontAwesomeIcon.ClipboardList, M3.AccentFor(0)))
         {
             M3Widgets.RowValue("Supplies with recipes", scope.CraftableRequirementCount.ToString(), color: scope.CraftableRequirementCount > 0 ? M3.Scheme.Info : null);
             M3Widgets.RowValue("Skipped, no recipe", scope.UncraftableRequirementCount.ToString(),
@@ -295,7 +295,7 @@ public partial class VulcanWindow
             M3Widgets.RowValue("Crafts", scope.TotalCraftsNeeded.ToString(), color: scope.TotalCraftsNeeded > 0 ? M3.Scheme.Success : null);
         }
 
-        using (M3Card.Begin("##workshopMakeList", "Make a crafting list", FontAwesomeIcon.ListUl, M3.AccentFor(1)))
+        using (M3Card.Begin("##workshopMakeList", "创建制作清单", FontAwesomeIcon.ListUl, M3.AccentFor(1)))
         {
             if (M3Widgets.RowNumber("Times", ref _workshopLoopCount, 1, 1, 999, supporting: "How many times to make this selection."))
             {
@@ -312,9 +312,9 @@ public partial class VulcanWindow
                 _workshopListNameLoopCount = _workshopLoopCount;
             }
 
-            M3Widgets.TextField("##workshopListName", "List name", ref _workshopListName, ImGui.GetContentRegionAvail().X - M3Card.RightInset, 256);
+            M3Widgets.TextField("##workshopListName", "清单名称", ref _workshopListName, ImGui.GetContentRegionAvail().X - M3Card.RightInset, 256);
             ImGui.Dummy(new Vector2(0, M3.Space1));
-            if (M3Widgets.Button("##createWorkshopList", "Create list", M3ButtonStyle.Filled, FontAwesomeIcon.Plus,
+            if (M3Widgets.Button("##createWorkshopList", "创建清单", M3ButtonStyle.Filled, FontAwesomeIcon.Plus,
                     enabled: scope.CraftableRequirementCount > 0,
                     tooltip: scope.CraftableRequirementCount > 0 ? null : "This selection has no workshop supplies with recipes to add to a Vulcan crafting list."))
             {
@@ -323,7 +323,7 @@ public partial class VulcanWindow
 
             ImGui.SameLine(0, M3.Space2);
             var canAddToExistingList = scope.CraftableRequirementCount > 0 && GatherBuddy.CraftingListManager.Lists.Count > 0;
-            if (M3Widgets.Button("##addWorkshopToExistingList", "Add to a list", M3ButtonStyle.Tonal, FontAwesomeIcon.FolderPlus,
+            if (M3Widgets.Button("##addWorkshopToExistingList", "添加到已有清单", M3ButtonStyle.Tonal, FontAwesomeIcon.FolderPlus,
                     enabled: canAddToExistingList,
                     tooltip: canAddToExistingList
                         ? "Add these recipes to one of your crafting lists."
@@ -340,7 +340,7 @@ public partial class VulcanWindow
         DrawIngredientSectionHeader("Workshop requirements", showRetainer);
         if (scope.Requirements.Count == 0)
         {
-            M3Text.Draw("No workshop requirements were found for this selection.", M3TextStyle.Faint);
+            M3Text.Draw("未找到当前选择的工房需求。", M3TextStyle.Faint);
         }
         else
         {
@@ -379,7 +379,7 @@ public partial class VulcanWindow
         }
 
         ImGui.Dummy(new Vector2(0, M3.Space2));
-        M3Widgets.SectionLabel("Recipes the list gets");
+        M3Widgets.SectionLabel("将加入清单的配方");
         var iconSize = VulcanUiScaling.Scaled(22f);
         foreach (var requirement in craftableRequirements)
         {
@@ -434,7 +434,7 @@ public partial class VulcanWindow
     private void DrawWorkshopAddToListPopup()
     {
         var scope = _selectedWorkshopScope;
-        using var dialog = M3Dialog.Begin(WorkshopAddToListPopupId, "Add to a crafting list",
+        using var dialog = M3Dialog.Begin(WorkshopAddToListPopupId, "添加到制作清单",
             scope == null ? "No workshop selection." : $"{scope.DisplayName}, {scope.Kind.ToString().ToLowerInvariant()}, ×{Math.Max(1, _workshopLoopCount)}",
             FontAwesomeIcon.FolderPlus, 460f);
         if (!dialog.IsOpen)
@@ -444,7 +444,7 @@ public partial class VulcanWindow
 
         if (scope != null)
         {
-            M3Widgets.SearchField("##WorkshopExistingListSearch", "Search lists", ref _workshopExistingListSearch, ImGui.GetContentRegionAvail().X);
+            M3Widgets.SearchField("##WorkshopExistingListSearch", "搜索清单", ref _workshopExistingListSearch, ImGui.GetContentRegionAvail().X);
             var filteredLists = new List<CraftingListDefinition>();
             foreach (var candidate in GatherBuddy.CraftingListManager.Lists)
             {
@@ -463,7 +463,7 @@ public partial class VulcanWindow
             {
                 if (filteredLists.Count == 0)
                 {
-                    M3Text.Draw("No lists match your search.", M3TextStyle.Faint);
+                    M3Text.Draw("没有符合搜索条件的清单。", M3TextStyle.Faint);
                 }
 
                 foreach (var list in filteredLists)

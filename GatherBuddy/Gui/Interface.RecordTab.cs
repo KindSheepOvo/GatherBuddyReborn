@@ -52,19 +52,19 @@ public partial class Interface
             }
         }
 
-        private static readonly ContentIdHeader _contentIdHeader = new() { Label = "Content ID" };
-        private static readonly BaitHeader _baitHeader = new() { Label = "Bait" };
-        private static readonly SpotHeader _spotHeader = new() { Label = "Fishing Spot" };
-        private static readonly CatchHeader _catchHeader = new() { Label = "Caught Fish" };
-        private static readonly CastStartHeader _castStartHeader = new() { Label = "TimeStamp" };
-        private static readonly BiteTypeHeader _biteTypeHeader = new() { Label = "Tug" };
-        private static readonly HookHeader _hookHeader = new() { Label = "Hookset" };
-        private static readonly DurationHeader _durationHeader = new() { Label = "Bite" };
-        private static readonly GatheringHeader _gatheringHeader = new() { Label = "Gath." };
-        private static readonly PerceptionHeader _perceptionHeader = new() { Label = "Perc." };
-        private static readonly AmountHeader _amountHeader = new() { Label = "Amt" };
-        private static readonly SizeHeader _sizeHeader = new() { Label = "Ilm" };
-        private static readonly FlagHeader _flagHeader = new() { Label = "Flags" };
+        private static readonly ContentIdHeader _contentIdHeader = new() { Label = "Content ID", LocalizedLabel = "角色 ID" };
+        private static readonly BaitHeader _baitHeader = new() { Label = "Bait", LocalizedLabel = "钓饵" };
+        private static readonly SpotHeader _spotHeader = new() { Label = "Fishing Spot", LocalizedLabel = "渔场" };
+        private static readonly CatchHeader _catchHeader = new() { Label = "Caught Fish", LocalizedLabel = "已捕获" };
+        private static readonly CastStartHeader _castStartHeader = new() { Label = "TimeStamp", LocalizedLabel = "时间戳" };
+        private static readonly BiteTypeHeader _biteTypeHeader = new() { Label = "Tug", LocalizedLabel = "咬钩强度" };
+        private static readonly HookHeader _hookHeader = new() { Label = "Hookset", LocalizedLabel = "提钩" };
+        private static readonly DurationHeader _durationHeader = new() { Label = "Bite", LocalizedLabel = "持续时间" };
+        private static readonly GatheringHeader _gatheringHeader = new() { Label = "Gath.", LocalizedLabel = "获得力" };
+        private static readonly PerceptionHeader _perceptionHeader = new() { Label = "Perc.", LocalizedLabel = "鉴别力" };
+        private static readonly AmountHeader _amountHeader = new() { Label = "Amt", LocalizedLabel = "数量" };
+        private static readonly SizeHeader _sizeHeader = new() { Label = "Ilm", LocalizedLabel = "尺寸" };
+        private static readonly FlagHeader _flagHeader = new() { Label = "Flags", LocalizedLabel = "标志" };
 
         private sealed class GatheringHeader : ColumnString<FishRecord>
         {
@@ -196,7 +196,7 @@ public partial class Interface
                     _deleteIdx = idx;
                 }
 
-                M3Tooltip.Hovered("Hold Control and right-click to delete...");
+                M3Tooltip.Hovered("按住 Ctrl 并右键点击以删除…");
             }
         }
 
@@ -705,13 +705,13 @@ public partial class Interface
         var row = new Ui.Row(M3Widgets.ButtonHeight);
         row.Place(ImGui.GetFrameHeight());
         M3Badge.Draw(shown == total ? $"{total} records" : $"{shown} of {total} records", shown == total ? M3.Scheme.Secondary : M3.Scheme.Primary,
-            shown == total ? null : "Some records are hidden by the column filters.");
+            shown == total ? null : "列筛选条件隐藏了部分记录。");
 
         void NextButton()
             => row.Next(M3Widgets.ButtonHeight, M3.Space2);
 
         NextButton();
-        if (M3Widgets.Button("##cleanup", "Clean up", M3ButtonStyle.Tonal, FontAwesomeIcon.Broom,
+        if (M3Widgets.Button("##cleanup", "清理", M3ButtonStyle.Tonal, FontAwesomeIcon.Broom,
                 tooltip: "Delete all entries that were marked as invalid for some reason, as well as all entries that have a duplicate "
                   + "(with the same content id and timestamp).\nUsually there are none.\nUse at your own risk, no backup is made."))
         {
@@ -720,13 +720,13 @@ public partial class Interface
         }
 
         NextButton();
-        if (M3Widgets.Button("##copy", "Copy", M3ButtonStyle.Tonal, FontAwesomeIcon.Copy,
-                tooltip: "Copy all fish records to your clipboard, to share them with other people. This may be a lot."))
+        if (M3Widgets.Button("##copy", "复制到剪贴板", M3ButtonStyle.Tonal, FontAwesomeIcon.Copy,
+                tooltip: "将所有钓鱼记录复制到剪贴板以便分享。数据量可能很大。"))
         {
             try
             {
                 ImGui.SetClipboardText(_plugin.FishRecorder.ExportBase64());
-                M3Snackbar.Show($"Copied {total} fish records.");
+                M3Snackbar.Show($"已复制 {total} 条钓鱼记录。");
             }
             catch (Exception e)
             {
@@ -735,8 +735,8 @@ public partial class Interface
         }
 
         NextButton();
-        if (M3Widgets.Button("##import", "Import", M3ButtonStyle.Tonal, FontAwesomeIcon.Paste,
-                tooltip: "Import fish records shared with you from your clipboard. Duplicates are skipped."))
+        if (M3Widgets.Button("##import", "从剪贴板导入", M3ButtonStyle.Tonal, FontAwesomeIcon.Paste,
+                tooltip: "从剪贴板导入别人分享的钓鱼记录。重复记录将跳过。"))
         {
             try
             {
@@ -749,8 +749,8 @@ public partial class Interface
         }
 
         NextButton();
-        if (M3Widgets.Button("##json", "Export JSON", M3ButtonStyle.Text, FontAwesomeIcon.FileExport,
-                tooltip: "Export all records to a single JSON file."))
+        if (M3Widgets.Button("##json", "导出 JSON", M3ButtonStyle.Text, FontAwesomeIcon.FileExport,
+                tooltip: "将全部记录导出为一个 JSON 文件。"))
         {
             WriteJson = true;
             WriteTsv = false;
@@ -758,8 +758,8 @@ public partial class Interface
         }
 
         NextButton();
-        if (M3Widgets.Button("##tsv", "Export TSV", M3ButtonStyle.Text, FontAwesomeIcon.FileCsv,
-                tooltip: "Export all records to a single tab-separated file."))
+        if (M3Widgets.Button("##tsv", "导出 TSV", M3ButtonStyle.Text, FontAwesomeIcon.FileCsv,
+                tooltip: "将全部记录导出为一个制表符分隔文件。"))
         {
             WriteTsv = true;
             WriteJson = false;
@@ -767,8 +767,8 @@ public partial class Interface
         }
 
         NextButton();
-        if (M3Widgets.Button("##caught", "Copy caught fish", M3ButtonStyle.Text, FontAwesomeIcon.ClipboardList,
-                tooltip: "Copy the item IDs of every fish in your fish log that you have caught, as JSON."))
+        if (M3Widgets.Button("##caught", "复制已捕获鱼类", M3ButtonStyle.Text, FontAwesomeIcon.ClipboardList,
+                tooltip: "将钓鱼手册中已捕获鱼类的物品 ID 复制为 JSON。"))
         {
             try
             {
@@ -802,18 +802,18 @@ public partial class Interface
 
     private void DrawRecordExportDialog()
     {
-        using var dialog = M3Dialog.Begin(RecordExportDialogId, WriteTsv ? "Export fish records as TSV" : "Export fish records as JSON",
-            "The full path of the file to write. An existing file is overwritten.", FontAwesomeIcon.FileExport, 420f);
+        using var dialog = M3Dialog.Begin(RecordExportDialogId, WriteTsv ? "导出钓鱼记录为 TSV" : "导出钓鱼记录为 JSON",
+            "输入输出文件的完整路径。已有文件会被覆盖。", FontAwesomeIcon.FileExport, 420f);
         if (!dialog.IsOpen)
         {
             return;
         }
 
-        M3Widgets.TextField("##path", "File path", ref _recordExportPath, ImGui.GetContentRegionAvail().X, 512);
+        M3Widgets.TextField("##path", "文件路径", ref _recordExportPath, ImGui.GetContentRegionAvail().X, 512);
         var pressed = M3Dialog.Actions(
         [
-            new M3DialogAction("Cancel"),
-            new M3DialogAction("Export", M3ButtonStyle.Filled, FontAwesomeIcon.Save, _recordExportPath.Trim().Length > 0),
+            new M3DialogAction("取消"),
+            new M3DialogAction("导出", M3ButtonStyle.Filled, FontAwesomeIcon.Save, _recordExportPath.Trim().Length > 0),
         ]);
         if (pressed != 1)
         {
@@ -826,12 +826,12 @@ public partial class Interface
             try
             {
                 _plugin.FishRecorder.ExportJson(new FileInfo(name));
-                M3Snackbar.Show($"Exported {_recordTable.TotalItems} fish records.");
+                M3Snackbar.Show($"已导出 {_recordTable.TotalItems} 条钓鱼记录。");
             }
             catch (Exception e)
             {
                 GatherBuddy.Log.Warning($"Could not export the json file to {name}:\n{e}");
-                M3Snackbar.Show("Could not export the fish records.", severity: M3Severity.Error);
+                M3Snackbar.Show("无法导出钓鱼记录。", severity: M3Severity.Error);
             }
         }
         else if (WriteTsv)
@@ -840,12 +840,12 @@ public partial class Interface
             {
                 File.WriteAllText(name, _recordTable.CreateTsv());
                 GatherBuddy.Log.Information($"Exported {_recordTable.TotalItems} fish records to {name}.");
-                M3Snackbar.Show($"Exported {_recordTable.TotalItems} fish records.");
+                M3Snackbar.Show($"已导出 {_recordTable.TotalItems} 条钓鱼记录。");
             }
             catch (Exception e)
             {
                 GatherBuddy.Log.Warning($"Could not export tsv file to {name}:\n{e}");
-                M3Snackbar.Show("Could not export the fish records.", severity: M3Severity.Error);
+                M3Snackbar.Show("无法导出钓鱼记录。", severity: M3Severity.Error);
             }
         }
 

@@ -36,8 +36,8 @@ public sealed partial class VendorBuyListWindow : M3PanelWindow
 
     private static readonly M3WindowAction[] VendorWindowActions =
     [
-        new("##vendor_open_vulcan", FontAwesomeIcon.Store, "Open Vulcan's Vendors page, to add items"),
-        new("##vendor_open_collectables", FontAwesomeIcon.BoxOpen, "Open the collectables window"),
+        new("##vendor_open_vulcan", FontAwesomeIcon.Store, "打开 Vulcan 的商店页面并添加物品"),
+        new("##vendor_open_collectables", FontAwesomeIcon.BoxOpen, "打开收藏品窗口"),
     ];
 
     private static readonly Vector2 DefaultSize = new(980f, 600f);
@@ -192,7 +192,7 @@ public sealed partial class VendorBuyListWindow : M3PanelWindow
         var activeList = VendorBuyListManager.ActiveList;
         if (activeList == null)
         {
-            M3Widgets.EmptyState("##vendor_no_lists", "No vendor lists", "Lists appear here once one is made.", FontAwesomeIcon.ShoppingCart);
+            M3Widgets.EmptyState("##vendor_no_lists", "暂无商店购买清单", "创建后，清单会显示在这里。", FontAwesomeIcon.ShoppingCart);
             return;
         }
 
@@ -224,16 +224,16 @@ public sealed partial class VendorBuyListWindow : M3PanelWindow
         var canModifyLists = !manager.IsBusy;
         var width = ImGui.GetContentRegionAvail().X;
 
-        M3Widgets.SectionLabel($"Lists · {VendorBuyListManager.Lists.Count}");
-        if (M3Widgets.Button("##vendor_new_list", "New list", M3ButtonStyle.Tonal, FontAwesomeIcon.Plus, width, canModifyLists,
-                canModifyLists ? null : "Wait until the running list finishes."))
+        M3Widgets.SectionLabel($"清单 · {VendorBuyListManager.Lists.Count}");
+        if (M3Widgets.Button("##vendor_new_list", "新建清单", M3ButtonStyle.Tonal, FontAwesomeIcon.Plus, width, canModifyLists,
+                canModifyLists ? null : "请等待当前清单运行完毕。"))
         {
             var list = manager.CreateList("Vendor List");
             OpenListNamePopup(list.Id, list.Name);
         }
 
-        if (M3Widgets.Button("##vendor_teamcraft_import", "TeamCraft import", M3ButtonStyle.Text, FontAwesomeIcon.FileImport, width, canModifyLists,
-                canModifyLists ? "Import the 'Vendors' section of a TeamCraft list." : "Wait until the running list finishes."))
+        if (M3Widgets.Button("##vendor_teamcraft_import", "从 TeamCraft 导入", M3ButtonStyle.Text, FontAwesomeIcon.FileImport, width, canModifyLists,
+                canModifyLists ? "导入 TeamCraft 清单中的商店物品。" : "请等待当前清单运行完毕。"))
         {
             OpenTeamCraftImportWindow(manager);
         }
@@ -341,9 +341,9 @@ public sealed partial class VendorBuyListWindow : M3PanelWindow
         if (entries.Count == 0)
         {
             ImGui.Dummy(new Vector2(0f, M3.Space3));
-            if (M3Widgets.EmptyState("##vendor_list_empty", "This list is empty",
-                    "Add supported vendor items from Vulcan's Vendors page, the Materials window, or a TeamCraft import.", FontAwesomeIcon.ShoppingCart,
-                    "Open Vulcan's Vendors page"))
+            if (M3Widgets.EmptyState("##vendor_list_empty", "此清单为空",
+                    "可从 Vulcan 商店页面、材料窗口或 TeamCraft 导入添加支持购买的物品。", FontAwesomeIcon.ShoppingCart,
+                    "打开 Vulcan 的商店页面"))
             {
                 GatherBuddy.VulcanWindow?.OpenToVendors();
             }
@@ -352,7 +352,7 @@ public sealed partial class VendorBuyListWindow : M3PanelWindow
         }
 
         DrawCurrencyRequirementSummary(currencyRequirements);
-        M3Widgets.SectionLabel("Entries");
+        M3Widgets.SectionLabel("条目");
         DrawEntryTable(entries, manager);
     }
 
@@ -389,7 +389,7 @@ public sealed partial class VendorBuyListWindow : M3PanelWindow
 
         var controlsX = origin.X + width - controlsWidth;
         ImGui.SetCursorScreenPos(new Vector2(controlsX, origin.Y + (height - renameSize) * 0.5f));
-        if (M3Widgets.IconButton("##vendor_rename_list", FontAwesomeIcon.Pen, "Rename this list", enabled: canModifyLists))
+        if (M3Widgets.IconButton("##vendor_rename_list", FontAwesomeIcon.Pen, "重命名此清单", enabled: canModifyLists))
         {
             OpenListNamePopup(activeList.Id, activeList.Name);
         }
@@ -397,7 +397,7 @@ public sealed partial class VendorBuyListWindow : M3PanelWindow
         ImGui.SetCursorScreenPos(new Vector2(controlsX + renameSize + gap, origin.Y + (height - M3Widgets.ButtonHeight) * 0.5f));
         var canDelete = canModifyLists && VendorBuyListManager.Lists.Count > 1;
         if (M3Widgets.HoldButton("##vendor_delete_list", "Delete", HoldToConfirmSeconds, M3ButtonStyle.Danger, FontAwesomeIcon.Trash, deleteWidth, canDelete,
-                VendorBuyListManager.Lists.Count <= 1 ? "The last list can't be deleted." : "Hold to delete this list."))
+                VendorBuyListManager.Lists.Count <= 1 ? "无法删除最后一份清单。" : "长按删除此清单。"))
         {
             manager.DeleteList(activeList.Id);
         }
@@ -412,22 +412,22 @@ public sealed partial class VendorBuyListWindow : M3PanelWindow
         {
             var canStart = entryCount > 0 && pending > 0 && !manager.IsBusy && vendorAutomationAvailable;
             var tooltip = !vendorAutomationAvailable ? VendorAutomationRequirements.UnavailableHelpText
-                : pending == 0 ? "Nothing on this list needs buying right now."
-                : "Run the active vendor list.";
-            if (M3Widgets.Button("##vendor_start", "Start list", M3ButtonStyle.Filled, FontAwesomeIcon.Play, enabled: canStart, tooltip: tooltip)
+                : pending == 0 ? "此清单目前没有需要购买的物品。"
+                : "运行当前商店购买清单。";
+            if (M3Widgets.Button("##vendor_start", "运行清单", M3ButtonStyle.Filled, FontAwesomeIcon.Play, enabled: canStart, tooltip: tooltip)
              && vendorAutomationAvailable)
             {
                 manager.Start();
             }
         }
-        else if (M3Widgets.Button("##vendor_stop", "Stop", M3ButtonStyle.Danger, FontAwesomeIcon.Stop))
+        else if (M3Widgets.Button("##vendor_stop", "停止", M3ButtonStyle.Danger, FontAwesomeIcon.Stop))
         {
             manager.Stop();
         }
 
         ImGui.SameLine();
-        if (M3Widgets.HoldButton("##vendor_clear", "Clear list", HoldToConfirmSeconds, M3ButtonStyle.Outlined, FontAwesomeIcon.Eraser,
-                enabled: entryCount > 0 && !manager.IsBusy, tooltip: "Hold to remove every entry from this list."))
+        if (M3Widgets.HoldButton("##vendor_clear", "清空清单", HoldToConfirmSeconds, M3ButtonStyle.Outlined, FontAwesomeIcon.Eraser,
+                enabled: entryCount > 0 && !manager.IsBusy, tooltip: "长按从清单中移除所有条目。"))
         {
             manager.Clear();
         }
@@ -487,10 +487,10 @@ public sealed partial class VendorBuyListWindow : M3PanelWindow
 
     private static void DrawCurrencyRequirementSummary(IReadOnlyList<VendorCurrencyRequirement> requirements)
     {
-        M3Widgets.SectionLabel("Currency · have / need");
+        M3Widgets.SectionLabel("货币 · 持有 / 需要");
         if (requirements.Count == 0)
         {
-            M3Text.Draw("No currency needed.", M3TextStyle.Muted);
+            M3Text.Draw("不需要货币。", M3TextStyle.Muted);
             ImGui.Dummy(new Vector2(0f, M3.Space1));
             return;
         }
@@ -619,7 +619,7 @@ public sealed partial class VendorBuyListWindow : M3PanelWindow
             return;
         }
 
-        using var dialog = M3Dialog.Begin(ListNameDialogId, "List name", "Press Enter or Save to keep it.", FontAwesomeIcon.None, 380f);
+        using var dialog = M3Dialog.Begin(ListNameDialogId, "清单名称", "按 Enter 或点击保存。", FontAwesomeIcon.None, 380f);
         if (!dialog.IsOpen)
         {
             return;
@@ -631,13 +631,13 @@ public sealed partial class VendorBuyListWindow : M3PanelWindow
             _focusListNameInput = false;
         }
 
-        M3TextField.Draw("##vendorBuyListNameInput", "List name", ref _listNameInput, ImGui.GetContentRegionAvail().X, 128);
+        M3TextField.Draw("##vendorBuyListNameInput", "清单名称", ref _listNameInput, ImGui.GetContentRegionAvail().X, 128);
         var submitted = ImGui.IsItemDeactivated() && (ImGui.IsKeyPressed(ImGuiKey.Enter) || ImGui.IsKeyPressed(ImGuiKey.KeypadEnter));
 
         var pressed = M3Dialog.Actions(
         [
-            new M3DialogAction("Cancel"),
-            new M3DialogAction("Save", M3ButtonStyle.Filled, FontAwesomeIcon.Check),
+            new M3DialogAction("取消"),
+            new M3DialogAction("保存", M3ButtonStyle.Filled, FontAwesomeIcon.Check),
         ]);
 
         if (submitted || pressed == 1)
@@ -687,7 +687,7 @@ public sealed partial class VendorBuyListWindow : M3PanelWindow
             manager.SetEntryEnabled(entry.Id, isEnabled);
         }
 
-        M3Tooltip.Hovered(isEnabled ? "Enabled. Click to skip this entry." : "Skipped. Click to buy it again.");
+        M3Tooltip.Hovered(isEnabled ? "此条目已启用，点击可跳过。" : "此条目已跳过，点击后重新购买。");
 
         row.Next(iconSize, VulcanUiScaling.Scaled(4f));
         var icon = Icons.DefaultStorage.TextureProvider.GetFromGameIcon(new GameIconLookup(entry.IconId));
@@ -704,7 +704,7 @@ public sealed partial class VendorBuyListWindow : M3PanelWindow
         var nameColor = isActive ? s.Primary : !entry.Enabled ? M3.Alpha(s.OnSurfaceVariant, 0.7f) : s.OnSurface;
         Ui.RowText(entry.ItemName, rowHeight, nameColor);
 
-        M3Tooltip.Hovered(isActive ? $"{entry.ItemName}\nBuying this now." : entry.ItemName);
+        M3Tooltip.Hovered(isActive ? $"{entry.ItemName}\n正在购买。" : entry.ItemName);
 
         ImGui.TableNextColumn();
         Ui.RowText($"{entry.Cost:N0}", rowHeight);
@@ -745,12 +745,12 @@ public sealed partial class VendorBuyListWindow : M3PanelWindow
         {
             var here = Dalamud.ClientState.TerritoryType == selectedVendor.Location.TerritoryId;
             Ui.RowText(selectedVendor.ZoneName, rowHeight, here ? success : s.OnSurface);
-            M3Tooltip.Hovered(here ? $"{selectedVendor.ZoneName}\nYou are in this zone." : selectedVendor.ZoneName);
+            M3Tooltip.Hovered(here ? $"{selectedVendor.ZoneName}\n你当前在此区域。" : selectedVendor.ZoneName);
         }
 
         ImGui.TableNextColumn();
         Ui.CenterInRow(rowHeight, ImGui.GetFrameHeight());
-        if (M3Widgets.IconButton($"##vendorBuyListRemove_{entry.Id}", FontAwesomeIcon.Trash, "Remove from the list", diameter: ImGui.GetFrameHeight(),
+        if (M3Widgets.IconButton($"##vendorBuyListRemove_{entry.Id}", FontAwesomeIcon.Trash, "从清单中移除", diameter: ImGui.GetFrameHeight(),
                 enabled: !isActive && !manager.IsBusy))
         {
             manager.RemoveEntry(entry.Id);

@@ -1,0 +1,145 @@
+name: Release Chinese GBR
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: chinese-gbr-release
+  cancel-in-progress: false
+
+jobs:
+  build:
+    if: github.repository == 'LienChan666/GatherBuddyReborn' && github.ref == 'refs/heads/main'
+    runs-on: windows-2025
+    timeout-minutes: 45
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Select assembly version
+        id: version
+        shell: pwsh
+        run: |
+          $run = [long]$env:GITHUB_RUN_NUMBER
+          if ($run -lt 1) { throw 'Invalid release workflow run number.' }
+          $build = 1000 + [long][Math]::Floor($run / 60000)
+          if ($build -gt 65534) { throw 'Version range exhausted.' }
+          $revision = $run % 60000
+          $version = "7.5.$build.$revision"
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Set up Dalamud API 15 references
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'dalamud-api15.zip'
+          $referencePath = Join-Path $env:APPDATA 'XIVLauncher\addon\Hooks\dev'
+          Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/goatcorp/dalamud-distrib/74c1ebada2e4b2036d39c2f1ff52f1d4b95180fa/latest.zip' -OutFile $archive
+          $sha256 = (Get-FileHash -Algorithm SHA256 -Path $archive).Hash
+          if ($sha256 -ne '3f0d8b64d2ed7c868b57541c81f5308692eb69bb856517fa3d14955fd056e815') {
+            throw 'Dalamud archive SHA-256 mismatch.'
+          }
+          Expand-Archive -Path $archive -DestinationPath $referencePath -Force
+          if (-not (Test-Path (Join-Path $referencePath 'Dalamud.dll'))) {
+            throw 'Dalamud.dll was not found in the reference directory.'
+          }
+
+      - name: Set up Dalamud CN API 15 references
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'dalamud-cn-api15.7z'
+          $referencePath = Join-Path $env:APPDATA 'XIVLauncherCN\addon\Hooks\dev'
+          Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/ottercorp/dalamud-distrib/5f709b7ebc53e00dcbf4d201180c6b9faec6abf4/latest.7z' -OutFile $archive
+          $sha256 = (Get-FileHash -Algorithm SHA256 -Path $archive).Hash
+          if ($sha256 -ne 'e67cee8916d21d2fca5766ceb47311d385bd6c35484f02b00ed8c8ff740f2926') {
+            throw 'Dalamud CN archive SHA-256 mismatch.'
+          }
+          $sevenZip = Join-Path $env:ProgramFiles '7-Zip\7z.exe'
+          & $sevenZip x $archive "-o$referencePath" -y
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path (Join-Path $referencePath 'Dalamud.dll'))) {
+            throw 'Dalamud CN references failed to extract.'
+          }
+
+      - name: Compile plugin with release version
+        shell: pwsh
+        env:
+          PLUGIN_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          dotnet restore GatherBuddy/GatherBuddy.csproj
+          if ($LASTEXITCODE) { throw 'Plugin restore failed.' }
+          dotnet build GatherBuddy/GatherBuddy.csproj --no-restore --configuration Release --output build "-p:Version=$env:PLUGIN_VERSION" "-p:AssemblyVersion=$env:PLUGIN_VERSION" "-p:FileVersion=$env:PLUGIN_VERSION" "-p:InformationalVersion=$env:PLUGIN_VERSION"
+          if ($LASTEXITCODE) { throw 'Plugin build failed.' }
+
+      - name: Compile pinned Raphael CLI
+        shell: pwsh
+        env:
+          RAPHAEL_COMMIT: '9311b0d262259bd8db727fbec2dfd08ff453b87b'
+          RAPHAEL_TOOLCHAIN: 'nightly-2026-05-10'
+        run: |
+          $source = Join-Path $env:RUNNER_TEMP 'raphael-src'
+          git init $source
+          if ($LASTEXITCODE) { throw 'Raphael repository initialization failed.' }
+          git -C $source fetch --no-tags --depth=1 https://github.com/KonaeAkira/raphael-rs.git $env:RAPHAEL_COMMIT
+          if ($LASTEXITCODE) { throw 'Pinned Raphael fetch failed.' }
+          git -C $source checkout --detach FETCH_HEAD
+          if ($LASTEXITCODE -or (git -C $source rev-parse HEAD) -ne $env:RAPHAEL_COMMIT) { throw 'Raphael source commit mismatch.' }
+          rustup toolchain install $env:RAPHAEL_TOOLCHAIN --profile minimal
+          if ($LASTEXITCODE) { throw 'Pinned Rust toolchain install failed.' }
+          Push-Location $source
+          try {
+            cargo "+$env:RAPHAEL_TOOLCHAIN" build --locked --release --package raphael-cli
+            if ($LASTEXITCODE) { throw 'Pinned Raphael build failed.' }
+            & '.\target\release\raphael-cli.exe' --version
+            if ($LASTEXITCODE) { throw 'Raphael executable smoke check failed.' }
+            Copy-Item '.\target\release\raphael-cli.exe' "$env:GITHUB_WORKSPACE/build/raphael-cli.exe"
+            Copy-Item './LICENSE' "$env:GITHUB_WORKSPACE/build/LICENSE.raphael-rs.txt"
+            Copy-Item "$env:GITHUB_WORKSPACE/LICENSE" "$env:GITHUB_WORKSPACE/build/LICENSE.GatherBuddyReborn.txt"
+          } finally {
+            Pop-Location
+          }
+
+      - name: Verify and package distributable
+        shell: pwsh
+        env:
+          PLUGIN_VERSION: ${{ steps.version.outputs.version }}
+        run: ./scripts/package-release-cn.ps1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gbr-cn-release
+          path: publish/
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: gbr-cn-release
+          path: publish/
+      - name: Publish versioned GitHub release
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PLUGIN_VERSION: ${{ needs.build.outputs.version }}
+        run: bash scripts/publish-release-cn.sh

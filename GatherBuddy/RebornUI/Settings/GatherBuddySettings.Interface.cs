@@ -13,107 +13,107 @@ namespace GatherBuddy.RebornUI;
 internal sealed partial class GatherBuddySettings
 {
     private M3SettingsPage BuildInterfacePage()
-        => new(InterfacePageId, "Interface settings", FontAwesomeIcon.Palette, "Theme, windows, overlays and colors",
-            new M3SettingsGroup("theme", "Theme", FontAwesomeIcon.Palette, "Applies to every GatherBuddy Reborn and Vulcan window.",
-                Custom("Accent color color theme scheme", DrawAccentColor),
-                Custom("Text size scale font", () => SettingRows.Slider("Text size", "Scales the text, on top of Dalamud's own font size.",
+        => new(InterfacePageId, "界面设置", FontAwesomeIcon.Palette, "主题、窗口、叠加显示和颜色",
+            new M3SettingsGroup("theme", "主题", FontAwesomeIcon.Palette, "应用于所有 GatherBuddy Reborn 和 Vulcan 窗口。",
+                Custom("Accent color color theme scheme 强调色 颜色 主题 配色", DrawAccentColor),
+                Custom("Text size scale font 文字大小 字号 字体", () => SettingRows.Slider("文字大小", "在 Dalamud 的字号基础上缩放文字。",
                     Config.UiTextScale, 0.75f, 2f, "%.2fx", v => Config.UiTextScale = MathF.Round(v, 2))),
-                Custom("Control size element scale buttons switches", () => SettingRows.Slider("Control size",
-                    "Scales buttons, switches, fields and the other controls.",
+                Custom("Control size element scale buttons switches 控件大小 缩放 按钮 开关", () => SettingRows.Slider("控件大小",
+                    "缩放按钮、开关、输入框和其他控件。",
                     Config.UiElementScale, 0.75f, 2f, "%.2fx", v => Config.UiElementScale = MathF.Round(v, 2))),
-                Custom("Spacing padding scale", () => SettingRows.Slider("Spacing", "Scales the space around and between things, without resizing them.",
+                Custom("Spacing padding scale 间距 留白 缩放", () => SettingRows.Slider("间距", "调整各元素之间的间距而不改变其大小。",
                     Config.UiPaddingScale, 0.5f, 2f, "%.2fx", v => Config.UiPaddingScale = MathF.Round(v, 2))),
-                Custom("Animation length motion", () => SettingRows.Slider("Animation length",
-                    "How long animations take, such as folding a window or opening a card. 0% turns them off.",
+                Custom("Animation length motion 动画时长 动效", () => SettingRows.Slider("动画时长",
+                    "调整折叠窗口、打开卡片等动画的时长；设为 0% 可关闭动画。",
                     Config.UiMotionScale * 100f, 0f, 200f, "%.0f%%", v => Config.UiMotionScale = MathF.Round(v) / 100f, 1f)),
-                Toggle("Compact layout", "Tighter padding and shorter rows, with descriptions shown on hover, so more fits on screen.",
+                Toggle("紧凑布局", "减少留白和行高，说明改为悬停显示，以便放下更多内容。",
                     () => Config.UiCompactLayout, v => Config.UiCompactLayout = v, "density dense tight tooltips"),
-                Toggle("Icons-only sidebar", "Turn the sidebar into a narrow strip of icons. Hover an icon to see its name.",
+                Toggle("侧栏仅显示图标", "将侧栏缩为一列图标，悬停时显示名称。",
                     () => Config.UiIconSidebar, v => Config.UiIconSidebar = v, "navigation narrow collapse strip"),
-                Custom("Reset sizes", DrawResetSizes)),
-            new M3SettingsGroup("main_window", "Main window", FontAwesomeIcon.WindowMaximize, null,
-                Toggle("Open on start", "Show the GatherBuddy window when you start the game.",
+                Custom("Reset sizes 重置大小", DrawResetSizes)),
+            new M3SettingsGroup("main_window", "主窗口", FontAwesomeIcon.WindowMaximize, null,
+                Toggle("启动时打开", "启动游戏时显示 GatherBuddy 窗口。",
                     () => Config.OpenOnStart, v => Config.OpenOnStart = v, "open config ui on start"),
-                Toggle("Escape closes main window", "Pressing Escape while the main window is focused closes it.",
+                Toggle("按 Esc 关闭主窗口", "主窗口获得焦点时，按 Esc 将其关闭。",
                     () => Config.CloseOnEscape, v => Config.CloseOnEscape = v),
-                Toggle("Lock window position", "Stop the main window from being moved.",
+                Toggle("锁定窗口位置", "禁止拖动主窗口。",
                     () => Config.MainWindowLockPosition, v => Config.MainWindowLockPosition = v, "lock config ui movement"),
-                Toggle("Lock window size", "Stop the main window from being resized.",
+                Toggle("锁定窗口大小", "禁止调整主窗口大小。",
                     () => Config.MainWindowLockResize, v => Config.MainWindowLockResize = v, "lock config ui size"),
-                Custom("Hotkey to open main interface", () => SettingRows.Hotkey("Hotkey to open the main window",
-                    "Opens or closes the main GatherBuddy window.", Config.MainInterfaceHotkey, v => Config.MainInterfaceHotkey = v)),
-                Toggle("Show names in weather page", "Write the weather names in the weather table, instead of only the icons with names on hover.",
+                Custom("Hotkey to open main interface 主窗口快捷键", () => SettingRows.Hotkey("主窗口快捷键",
+                    "打开或关闭 GatherBuddy 主窗口。", Config.MainInterfaceHotkey, v => Config.MainInterfaceHotkey = v)),
+                Toggle("在天气页面显示天气名称", "在天气表中显示天气名称，不必悬停在图标上查看。",
                     () => Config.ShowWeatherNames, v => Config.ShowWeatherNames = v, "weather tab"),
-                Toggle("Show status line", "Show a status line below the gatherables and fish tables.",
+                Toggle("显示状态栏", "在采集物和鱼类列表下方显示状态栏。",
                     () => Config.ShowStatusLine, v => Config.ShowStatusLine = v),
-                Toggle("Hide GatherClippy button", "Permanently hide the GatherClippy button on the Gatherables and Fish pages.",
+                Toggle("隐藏 GatherClippy 按钮", "始终在采集物和鱼类页面隐藏 GatherClippy 按钮。",
                     () => Config.HideClippy, v => Config.HideClippy = v),
-                Int("Upcoming windows uptime count", "How many gathering windows the upcoming uptimes tooltip lists.",
+                Int("即将出现的时段数量", "设置提示中列出的后续采集时段数量。",
                     () => Config.UpcomingUptimesCount, v => Config.UpcomingUptimesCount = (ushort)v, 1, 100)),
-            new M3SettingsGroup("fish_timer", "Fish timer", FontAwesomeIcon.Stopwatch, null,
-                Toggle("Keep fish records", "Store fish records on your computer. The fish timer needs these for bite timings.",
+            new M3SettingsGroup("fish_timer", "钓鱼计时器", FontAwesomeIcon.Stopwatch, null,
+                Toggle("保存钓鱼记录", "在本机保存钓鱼记录，供钓鱼计时器计算咬钩时间。",
                     () => Config.StoreFishRecords, v => Config.StoreFishRecords = v),
-                Toggle("Use local time in records", "Show timestamps on the Fish Records page in local time instead of Unix time.",
+                Toggle("使用本地时间显示记录", "在钓鱼记录页面用本地时间显示时间戳，而不是 Unix 时间。",
                     () => Config.UseUnixTimeFishRecords, v => Config.UseUnixTimeFishRecords = v),
-                Toggle("Show fish timer", "Show the fish timer window while fishing.",
+                Toggle("显示钓鱼计时器", "钓鱼时显示钓鱼计时器窗口。",
                     () => Config.ShowFishTimer, v => Config.ShowFishTimer = v),
-                Toggle("Edit fish timer", "Let the fish timer window be moved and resized.",
+                Toggle("编辑钓鱼计时器", "允许移动钓鱼计时器窗口并调整其大小。",
                     () => Config.FishTimerEdit, v => Config.FishTimerEdit = v),
-                Toggle("Enable fish timer clickthrough", "Let clicks go through the fish timer, which also turns off its context menus.",
+                Toggle("启用钓鱼计时器点击穿透", "让点击穿过钓鱼计时器，同时禁用其右键菜单。",
                     () => Config.FishTimerClickthrough, v => Config.FishTimerClickthrough = v),
-                Toggle("Hide uncaught fish in fish timer",
-                    "Hide fish that have never been recorded with your current combination of snagging and bait.",
+                Toggle("在钓鱼计时器中隐藏未捕获的鱼",
+                    "隐藏在当前撒饵和鱼饵组合下从未记录过的鱼。",
                     () => Config.HideUncaughtFish, v => Config.HideUncaughtFish = v),
-                Toggle("Hide unavailable fish in fish timer",
-                    "Hide fish with known requirements you don't meet, like Fisher's Intuition or snagging.",
+                Toggle("在钓鱼计时器中隐藏不可用的鱼",
+                    "隐藏已知条件未满足的鱼，例如缺少捕鱼人之识或撒饵。",
                     () => Config.HideUnavailableFish, v => Config.HideUnavailableFish = v),
-                Toggle("Show uptimes in fish timer", "Show the uptimes of restricted fish in the fish timer window.",
+                Toggle("在钓鱼计时器中显示出现时段", "在钓鱼计时器窗口中显示受限鱼类的出现时段。",
                     () => Config.ShowFishTimerUptimes, v => Config.ShowFishTimerUptimes = v),
-                Custom("Fish timer bite time scale seconds", DrawBiteTimeScale),
-                Custom("Fish timer interval separators", () => SettingRows.Slider("Fish timer interval separators",
-                    "How many interval lines, with their seconds, the timer shows. 0 turns them off.",
+                Custom("Fish timer bite time scale seconds 钓鱼计时器 咬钩时间 秒数", DrawBiteTimeScale),
+                Custom("Fish timer interval separators 钓鱼计时器 间隔分隔线", () => SettingRows.Slider("钓鱼计时器间隔分隔线",
+                    "设置计时器显示的间隔分隔线及秒数的数量。设为 0 可关闭。",
                     Config.ShowSecondIntervals, 0, 16, v => Config.ShowSecondIntervals = (byte)v)),
-                Custom("Fish timer interval rounding digits", () => SettingRows.Slider("Fish timer interval rounding",
-                    "Round the interval seconds to this many digits after the decimal point. 0 shows whole numbers.",
+                Custom("Fish timer interval rounding digits 钓鱼计时器 间隔 小数位数", () => SettingRows.Slider("钓鱼计时器间隔取整",
+                    "设置间隔秒数保留的小数位数。设为 0 显示整数。",
                     Config.SecondIntervalsRounding, 0, 3, v => Config.SecondIntervalsRounding = v)),
-                Toggle("Hide catch popup", "Don't show the popup with your caught fish and its size, amount and quality.",
+                Toggle("隐藏上钩提示", "不显示捕获鱼的尺寸、数量和品质弹窗。",
                     () => Config.HideFishSizePopup, v => Config.HideFishSizePopup = v),
-                Toggle("Show collectable hints", "Show whether a fish is collectable in the fish timer window.",
+                Toggle("显示收藏品提示", "在钓鱼计时器中显示鱼是否为收藏品。",
                     () => Config.ShowCollectableHints, v => Config.ShowCollectableHints = v),
-                Toggle("Show multi hook hints", "Show whether a fish can be double or triple hooked in Cosmic Exploration and Ocean Fishing.",
+                Toggle("显示多重提钩提示", "显示宇宙探索和海钓中的鱼是否可用双重提钩或三重提钩。",
                     () => Config.ShowMultiHookHints, v => Config.ShowMultiHookHints = v)),
-            new M3SettingsGroup("fish_stats", "Fish stats", FontAwesomeIcon.ChartBar, null,
-                Toggle("Enable fish stats", "Adds a page that collects and reports fish stats from your local records. Currently in testing.",
+            new M3SettingsGroup("fish_stats", "捕鱼统计", FontAwesomeIcon.ChartBar, null,
+                Toggle("启用捕鱼统计", "增加一个页面来汇总并报告本地钓鱼记录。此功能正在测试中。",
                     () => Config.EnableFishStats, v => Config.EnableFishStats = v),
-                Toggle("Copy time stats when reporting", "Add the minimum and maximum times when copying a report.",
+                Toggle("复制报告时包含时间统计", "复制报告时附上最短和最长时间。",
                     () => Config.EnableReportTime, v => Config.EnableReportTime = v),
-                Toggle("Copy size stats when reporting", "Add the minimum and maximum sizes when copying a report.",
+                Toggle("复制报告时包含尺寸统计", "复制报告时附上最小和最大尺寸。",
                     () => Config.EnableReportSize, v => Config.EnableReportSize = v),
-                Toggle("Copy multi hook stats when reporting", "Add stats about multi-hook yields when copying a report.",
+                Toggle("复制报告时包含多重提钩统计", "复制报告时附上多重提钩的产量统计。",
                     () => Config.EnableReportMulti, v => Config.EnableReportMulti = v),
-                Toggle("Enable graphs", "Visualise the report data when viewing a fishing spot. Very experimental.",
+                Toggle("启用图表", "查看渔场时将报告数据绘成图表。此功能目前处于实验阶段。",
                     () => Config.EnableFishStatsGraphs, v => Config.EnableFishStatsGraphs = v)),
-            new M3SettingsGroup("gather_window", "Gather window", FontAwesomeIcon.ListUl, "The small window with your pinned items and their uptimes.",
-                Toggle("Show gather window", "Show a small window with pinned gatherables and their uptimes.",
+            new M3SettingsGroup("gather_window", "采集窗口", FontAwesomeIcon.ListUl, "显示已固定物品及其出现时段的小窗口。",
+                Toggle("显示采集窗口", "显示一个小窗口，列出已固定的采集物和它们的出现时段。",
                     () => Config.ShowGatherWindow, v => Config.ShowGatherWindow = v),
-                Toggle("Anchor gather window to bottom left", "The window grows and shrinks from the top instead of the bottom.",
+                Toggle("将采集窗口固定在左下角", "窗口改为从顶部伸缩，而非从底部伸缩。",
                     () => Config.GatherWindowBottomAnchor, v => Config.GatherWindowBottomAnchor = v),
-                Toggle("Show gather window timers", "Show the uptimes of the items in the gather window.",
+                Toggle("显示采集窗口计时", "在采集窗口中显示物品的出现时段。",
                     () => Config.ShowGatherWindowTimers, v => Config.ShowGatherWindowTimers = v),
-                Toggle("Show active alarms in gather window",
-                    "Also show active alarms as a last preset in the gather window, following the window's usual rules.",
+                Toggle("在采集窗口中显示已启用的闹钟",
+                    "按照采集窗口的原有规则，把已启用的闹钟作为最后一个预设一并显示。",
                     () => Config.ShowGatherWindowAlarms, SetGatherWindowAlarms),
-                Toggle("Sort gather window by uptime", "Sort the items in the gather window by their uptimes.",
+                Toggle("按出现时段排序采集窗口", "按出现时段对采集窗口中的物品排序。",
                     () => Config.SortGatherWindowByUptime, v => Config.SortGatherWindowByUptime = v),
-                Toggle("Show only available items", "Only show the items from your gather window setup that are available right now.",
+                Toggle("仅显示当前可采集的物品", "在采集窗口中只显示当前可获取的物品。",
                     () => Config.ShowGatherWindowOnlyAvailable, v => Config.ShowGatherWindowOnlyAvailable = v),
-                Toggle("Hide completed items", "Hide items you already have the required amount of in your inventory.",
+                Toggle("隐藏已采齐的物品", "如果背包中已有足够数量，则隐藏该物品。",
                     () => Config.HideGatherWindowCompletedItems, v => Config.HideGatherWindowCompletedItems = v),
-                Toggle("Hide gather window in duty", "Hide the gather window while you are bound by any duty.",
+                Toggle("在副本中隐藏采集窗口", "处于副本中时隐藏采集窗口。",
                     () => Config.HideGatherWindowInDuty, v => Config.HideGatherWindowInDuty = v),
-                Custom("Only show gather window if holding key hotkey to hold", () =>
+                Custom("Only show gather window if holding key hotkey to hold 采集窗口 按住 快捷键", () =>
                 {
-                    SettingRows.Switch("Only show gather window while holding a key", "The gather window only shows while you hold the key below.",
+                    SettingRows.Switch("仅在按住按键时显示采集窗口", "采集窗口仅在你按住下方设置的按键时显示。",
                         Config.OnlyShowGatherWindowHoldingKey, v => Config.OnlyShowGatherWindowHoldingKey = v);
                     if (!Config.OnlyShowGatherWindowHoldingKey)
                     {
@@ -121,33 +121,33 @@ internal sealed partial class GatherBuddySettings
                     }
 
                     using var sub = M3SubGroup.Begin();
-                    SettingRows.HoldKey("Key to hold", "Hold this key to keep the gather window visible. Click, then press it; Alt, Ctrl and Shift work on their own.",
+                    SettingRows.HoldKey("要按住的按键", "按住此键可显示采集窗口。点击后按键设置；Alt、Ctrl 和 Shift 可单独使用。",
                         Config.GatherWindowHoldKey, Configuration.ValidKeys, v => Config.GatherWindowHoldKey = v);
                 }),
-                Toggle("Lock gather window position", "Stop the gather window from being dragged around.",
+                Toggle("锁定采集窗口位置", "禁止拖动采集窗口。",
                     () => Config.LockGatherWindow, v => Config.LockGatherWindow = v),
-                Custom("Hotkey to open gather window", () => SettingRows.Hotkey("Hotkey to open the gather window",
-                    "Opens or closes the gather window.", Config.GatherWindowHotkey, v => Config.GatherWindowHotkey = v)),
-                Custom("Modifier to delete items on right-click", () => SettingRows.Modifier("Modifier to delete items on right-click",
-                    "Hold this while right-clicking an item in the gather window to remove it.",
+                Custom("Hotkey to open gather window 采集窗口快捷键", () => SettingRows.Hotkey("采集窗口快捷键",
+                    "打开或关闭采集窗口。", Config.GatherWindowHotkey, v => Config.GatherWindowHotkey = v)),
+                Custom("Modifier to delete items on right-click 右键删除 修饰键", () => SettingRows.Modifier("右键删除物品的修饰键",
+                    "按住此键并右键点击采集窗口中的物品，即可将其移除。",
                     Config.GatherWindowDeleteModifier, v => Config.GatherWindowDeleteModifier = v))),
-            new M3SettingsGroup("spearfishing", "Spearfishing", FontAwesomeIcon.Water, null,
-                Toggle("Show spearfishing helper", "Show the spearfishing helper while spearfishing.",
+            new M3SettingsGroup("spearfishing", "刺鱼", FontAwesomeIcon.Water, null,
+                Toggle("显示刺鱼助手", "刺鱼时显示刺鱼助手。",
                     () => Config.ShowSpearfishHelper, v => Config.ShowSpearfishHelper = v),
-                Toggle("Show fish name overlay", "Show the names of identified fish in the spearfishing window.",
+                Toggle("叠加显示鱼名", "在刺鱼窗口中显示已识别鱼类的名称。",
                     () => Config.ShowSpearfishNames, v => Config.ShowSpearfishNames = v),
-                Toggle("Show speed of fish in overlay", "Show the speed of fish in the spearfishing window, next to their names.",
+                Toggle("叠加显示游动速度", "在刺鱼窗口的鱼名旁显示其游动速度。",
                     () => Config.ShowSpearfishSpeed, v => Config.ShowSpearfishSpeed = v),
-                Toggle("Show list of available fish", "List the fish available at your current spearfishing spot beside the spearfishing window.",
+                Toggle("显示可捕获鱼类列表", "在刺鱼窗口旁列出当前刺鱼点可捕获的鱼。",
                     () => Config.ShowAvailableSpearfish, v => Config.ShowAvailableSpearfish = v),
-                Toggle("Show speed and size as text", "Show the speed and size of available fish as text instead of icons.",
+                Toggle("用文字显示速度和尺寸", "以文字代替图标，显示可捕获鱼类的速度和尺寸。",
                     () => Config.ShowSpearfishListIconsAsText, v => Config.ShowSpearfishListIconsAsText = v),
-                Toggle("Show center line", "Show a straight line up from the center of the gig in the spearfishing window.",
+                Toggle("显示中线", "从鱼叉中心向上绘制一条直线。",
                     () => Config.ShowSpearfishCenterLine, v => Config.ShowSpearfishCenterLine = v),
-                Custom("Show fish names in fixed position fish name position percentage", () =>
+                Custom("Show fish names in fixed position fish name position percentage 鱼名固定位置 鱼名高度 百分比", () =>
                 {
-                    SettingRows.Switch("Show fish names in fixed position",
-                        "Show the names of identified fish at a fixed height instead of on the moving fish.",
+                    SettingRows.Switch("在固定位置显示鱼名",
+                        "将已识别鱼类的名称固定在指定高度，不随鱼移动。",
                         Config.FixNamesOnPosition, v => Config.FixNamesOnPosition = v);
                     if (!Config.FixNamesOnPosition)
                     {
@@ -155,18 +155,18 @@ internal sealed partial class GatherBuddySettings
                     }
 
                     using var sub = M3SubGroup.Begin();
-                    SettingRows.Slider("Fish name position", "How far up the spearfishing window the names sit.",
+                    SettingRows.Slider("鱼名位置", "设置鱼名在刺鱼窗口中的高度。",
                         Config.FixNamesPercentage, 0, 100, v => Config.FixNamesPercentage = (byte)v);
                 })),
-            new M3SettingsGroup("colors", "Colors", FontAwesomeIcon.PaintBrush, "Colors used in tables, the gather window and chat messages.",
-                Custom($"Colors colors {string.Join(' ', Array.ConvertAll(ColorIds, c => c.Data().Name))}", DrawColors),
-                Custom("Names in chat commands in chat arguments in chat alarm message in chat palette", DrawChatColors)));
+            new M3SettingsGroup("colors", "颜色", FontAwesomeIcon.PaintBrush, "采集列表、采集窗口和聊天消息使用的颜色。",
+                Custom($"Colors colors {string.Join(' ', Array.ConvertAll(ColorIds, c => c.Data().Name))} 颜色 配色", DrawColors),
+                Custom("Names in chat commands in chat arguments in chat alarm message in chat palette 聊天颜色 名称 命令 参数 闹钟 调色板", DrawChatColors)));
 
     private static void DrawAccentColor()
     {
         var accent = Config.UiAccentColor;
-        if (M3Widgets.RowColorChoices("Accent color", ref accent, MaterialUI.AccentPresets,
-                "The whole color scheme is built from this one color. Pick a preset, or the last swatch for your own color."))
+        if (M3Widgets.RowColorChoices("强调色", ref accent, MaterialUI.AccentPresets,
+                "整套配色方案以该颜色为基准。可选择预设，也可用最后一个色块自定义。"))
         {
             Config.UiAccentColor = accent with { W = 1f };
             Config.Save();
@@ -176,7 +176,7 @@ internal sealed partial class GatherBuddySettings
     private static void DrawResetSizes()
     {
         var isDefault = Config.UiTextScale == 1f && Config.UiElementScale == 1f && Config.UiPaddingScale == 1f && Config.UiMotionScale == 1f;
-        if (!M3Widgets.Button("##theme_reset_sizes", "Reset sizes", M3ButtonStyle.Text, FontAwesomeIcon.Undo, enabled: !isDefault))
+        if (!M3Widgets.Button("##theme_reset_sizes", "重置大小", M3ButtonStyle.Text, FontAwesomeIcon.Undo, enabled: !isDefault))
         {
             return;
         }
@@ -191,9 +191,9 @@ internal sealed partial class GatherBuddySettings
     private static void DrawBiteTimeScale()
     {
         var seconds = Config.FishTimerScale / 1000f;
-        SettingRows.Number("Fish timer bite time scale",
-            "The fish timer's bite times are scaled to this. Bites longer than this don't show their progress bar and bite windows. "
-          + "Keep it as high as your longest bite window and otherwise as low as possible; about 40 seconds is usually enough.",
+        SettingRows.Number("钓鱼计时器咬钩时间上限",
+            "计时器按此时间缩放。超过此时间的咬钩不会显示进度条和咬钩时段。"
+          + "建议设置为略长于最长咬钩时段，除此之外尽量调低；通常约 40 秒就够了。",
             seconds, FishRecord.MinBiteTime * 2 / 1000f, FishRecord.MaxBiteTime / 1000f,
             v => Config.FishTimerScale = (ushort)Math.Clamp((int)(v * 1000f + 0.9f), FishRecord.MinBiteTime * 2, FishRecord.MaxBiteTime),
             0.5f, "%.1f", "s");
@@ -222,11 +222,11 @@ internal sealed partial class GatherBuddySettings
 
     private static void DrawChatColors()
     {
-        M3Widgets.SectionLabel("Chat colors");
-        DrawPaletteColor("Names in chat", Config.SeColorNames, Configuration.DefaultSeColorNames, i => Config.SeColorNames = i);
-        DrawPaletteColor("Commands in chat", Config.SeColorCommands, Configuration.DefaultSeColorCommands, i => Config.SeColorCommands = i);
-        DrawPaletteColor("Arguments in chat", Config.SeColorArguments, Configuration.DefaultSeColorArguments, i => Config.SeColorArguments = i);
-        DrawPaletteColor("Alarm message in chat", Config.SeColorAlarm, Configuration.DefaultSeColorAlarm, i => Config.SeColorAlarm = i);
+        M3Widgets.SectionLabel("聊天颜色");
+        DrawPaletteColor("聊天中的名称", Config.SeColorNames, Configuration.DefaultSeColorNames, i => Config.SeColorNames = i);
+        DrawPaletteColor("聊天中的命令", Config.SeColorCommands, Configuration.DefaultSeColorCommands, i => Config.SeColorCommands = i);
+        DrawPaletteColor("聊天中的参数", Config.SeColorArguments, Configuration.DefaultSeColorArguments, i => Config.SeColorArguments = i);
+        DrawPaletteColor("聊天中的闹钟消息", Config.SeColorAlarm, Configuration.DefaultSeColorAlarm, i => Config.SeColorAlarm = i);
     }
 
     private static void DrawPaletteColor(string label, int current, int defaultIndex, Action<int> setter)
@@ -238,7 +238,7 @@ internal sealed partial class GatherBuddySettings
         var canReset = current != defaultIndex && colors.ContainsKey(defaultIndex);
         var controlSize = new Vector2(swatch + (canReset ? M3.Space1 + resetSize : 0f), MathF.Max(swatch, resetSize));
 
-        var row = M3SettingRow.Begin(label, "Click the swatch to pick a colour, right-click it to clear.", controlSize);
+        var row = M3SettingRow.Begin(label, "点击色块选择颜色，右键点击可清除。", controlSize);
         var origin = row.ControlPosition;
         var popupId = $"##palette_{label}";
 
@@ -269,7 +269,7 @@ internal sealed partial class GatherBuddySettings
         if (hovered)
         {
             ImGui.SetMouseCursor(ImGuiMouseCursor.Hand);
-            M3Tooltip.Show(hasColor ? $"Color {current}" : "No color");
+            M3Tooltip.Show(hasColor ? $"颜色 {current}" : "无颜色");
         }
 
         if (ImGui.IsItemClicked(ImGuiMouseButton.Right) && current != -1)
@@ -281,7 +281,7 @@ internal sealed partial class GatherBuddySettings
         if (canReset)
         {
             ImGui.SetCursorScreenPos(origin + new Vector2(swatch + M3.Space1, (controlSize.Y - resetSize) * 0.5f));
-            if (M3Widgets.IconButton($"##palette_reset_{label}", FontAwesomeIcon.Undo, "Reset to default", diameter: resetSize))
+            if (M3Widgets.IconButton($"##palette_reset_{label}", FontAwesomeIcon.Undo, "恢复默认颜色", diameter: resetSize))
             {
                 setter(defaultIndex);
                 Config.Save();
@@ -330,7 +330,7 @@ internal sealed partial class GatherBuddySettings
 
             if (ImGui.IsItemHovered())
             {
-                M3Tooltip.Show($"Color {index}");
+                M3Tooltip.Show($"颜色 {index}");
             }
         }
 

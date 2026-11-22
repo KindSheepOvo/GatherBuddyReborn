@@ -163,7 +163,7 @@ public partial class Interface
         var current = _autoGatherListsCache.Selector.Selected;
         var row = new Ui.Row(M3Widgets.ButtonHeight);
         row.Place(M3Widgets.IconButtonSize);
-        if (M3Widgets.IconButton("##copy", FontAwesomeIcon.Copy, "Copy this auto-gather list to your clipboard", enabled: current != null))
+        if (M3Widgets.IconButton("##copy", FontAwesomeIcon.Copy, "复制本自动采集清单到剪贴板", enabled: current != null))
         {
             try
             {
@@ -179,7 +179,7 @@ public partial class Interface
         if (Reflection.ArtisanExporter.ArtisanAssemblyEnabled)
         {
             row.Next(M3Widgets.ButtonHeight, M3.Space1);
-            if (M3Widgets.Button("##artisan", "Import from Artisan", M3ButtonStyle.Text, FontAwesomeIcon.FileImport,
+            if (M3Widgets.Button("##artisan", "从 Artisan 导入", M3ButtonStyle.Text, FontAwesomeIcon.FileImport,
                     tooltip: "Pick one of your Artisan lists to import into a new auto-gather list."))
             {
                 M3Menu.Open("##artisanImport");
@@ -201,7 +201,7 @@ public partial class Interface
         }
 
         row.Next(M3Widgets.ButtonHeight, M3.Space1);
-        if (M3Widgets.Button("##teamcraft", "Import from TeamCraft", M3ButtonStyle.Text, FontAwesomeIcon.Paste, enabled: current != null,
+        if (M3Widgets.Button("##teamcraft", "从 TeamCraft 导入", M3ButtonStyle.Text, FontAwesomeIcon.Paste, enabled: current != null,
                 tooltip: "Add the items of a TeamCraft list in your clipboard to this list."))
         {
             ImportTeamCraftList(current!);
@@ -215,7 +215,7 @@ public partial class Interface
           + "Drag items by their handle to rearrange them, or onto another list in the tree to move them there.\n"
           + "In the Gather Window, hold Control and right-click an item to delete it from the list it belongs to.");
         row.Next(M3Widgets.IconButtonSize, M3.Space1);
-        if (M3Widgets.IconButton("##discord", FontAwesomeIcon.Comments, "Open the Auto-Gather support Discord"))
+        if (M3Widgets.IconButton("##discord", FontAwesomeIcon.Comments, "打开自动采集支持 Discord"))
         {
             System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
             {
@@ -239,7 +239,7 @@ public partial class Interface
 
         if (string.IsNullOrEmpty(clipboardText))
         {
-            M3Snackbar.Show("Your clipboard is empty.", severity: M3Severity.Error);
+            M3Snackbar.Show("剪贴板为空。", severity: M3Severity.Error);
             return;
         }
 
@@ -317,7 +317,7 @@ public partial class Interface
                 _plugin.AutoGatherListsManager.SetActiveItems();
             }
 
-            M3Snackbar.Show(added == 0 ? "No gatherable items were found in your clipboard." : $"Added {added} items from TeamCraft.",
+            M3Snackbar.Show(added == 0 ? "剪贴板中没有找到可采集物品。" : $"已从 TeamCraft 添加 {added} 个物品。",
                 severity: added == 0 ? M3Severity.Warning : M3Severity.Neutral);
         }
         catch (Exception e)
@@ -358,7 +358,7 @@ public partial class Interface
             _plugin.AutoGatherListsManager.ToggleList(list);
         }
 
-        M3Tooltip.Hovered("Gather the enabled items of this list.");
+        M3Tooltip.Hovered("采集本清单中已启用的物品。");
         row.NextText(enabled ? "Enabled" : "Disabled", M3TextStyle.Muted, M3.Space2);
         row.Next(checkboxHeight, M3.Space3 * 2);
         DrawAutoGatherListOption("Fallback##list",
@@ -379,12 +379,12 @@ public partial class Interface
 
         ImGui.Dummy(new Vector2(0, M3.Space1));
         var itemFilter = _autoGatherListsCache.ItemFilter;
-        if (M3Widgets.SearchField("##autoGatherItemFilter", "Search items", ref itemFilter, 220f * M3.Scale))
+        if (M3Widgets.SearchField("##autoGatherItemFilter", "搜索物品", ref itemFilter, 220f * M3.Scale))
         {
             _autoGatherListsCache.ItemFilter = itemFilter;
         }
 
-        M3Tooltip.Hovered("Filter items by name. Reordering is off while a search is active.");
+        M3Tooltip.Hovered("按名称筛选物品。搜索时无法调整顺序。");
 
         var filterKeywords = _autoGatherListsCache.ItemFilter.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
         var filteringItems = filterKeywords.Length > 0;
@@ -409,13 +409,13 @@ public partial class Interface
         }
 
         SameRow(M3Widgets.IconButtonSize);
-        if (M3Widgets.IconButton("##enableVisible", FontAwesomeIcon.Check, "Enable the items shown", enabled: visibleItems.Count > 0))
+        if (M3Widgets.IconButton("##enableVisible", FontAwesomeIcon.Check, "启用当前显示的物品", enabled: visibleItems.Count > 0))
         {
             _plugin.AutoGatherListsManager.ChangeEnabled(list, visibleItems, true);
         }
 
         SameRow(M3Widgets.IconButtonSize);
-        if (M3Widgets.IconButton("##disableVisible", FontAwesomeIcon.Ban, "Disable the items shown", enabled: visibleItems.Count > 0))
+        if (M3Widgets.IconButton("##disableVisible", FontAwesomeIcon.Ban, "禁用当前显示的物品", enabled: visibleItems.Count > 0))
         {
             _plugin.AutoGatherListsManager.ChangeEnabled(list, visibleItems, false);
         }
@@ -504,7 +504,7 @@ public partial class Interface
 
                     ImGui.TableNextColumn();
                     Ui.CenterInRow(rowHeight, ImGui.GetFrameHeight());
-                    if (M3Widgets.IconButton("##delete", FontAwesomeIcon.Trash, "Remove this item from the list", diameter: ImGui.GetFrameHeight()))
+                    if (M3Widgets.IconButton("##delete", FontAwesomeIcon.Trash, "从清单中移除此物品", diameter: ImGui.GetFrameHeight()))
                     {
                         deleteIndex = i;
                     }
@@ -530,7 +530,7 @@ public partial class Interface
                     var invTotal = item.GetTotalCount(list.UsesRetainerInventory);
                     var quantity = list.Quantities.TryGetValue(item, out var q) ? (int)q : 1;
                     Ui.RightAligned(invTotal.ToString("N0"), rowHeight: rowHeight);
-                    M3Tooltip.Hovered(list.UsesRetainerInventory ? "In your inventory and retainers" : "In your inventory");
+                    M3Tooltip.Hovered(list.UsesRetainerInventory ? "背包和雇员持有数量" : "背包持有数量");
 
                     ImGui.TableNextColumn();
                     if (M3Widgets.NumberField("##quantity", ref quantity, 120f * M3.Scale, 1, 1, int.MaxValue))
@@ -550,7 +550,7 @@ public partial class Interface
                 ImGui.TableNextColumn();
                 ImGui.TableNextColumn();
                 Ui.CenterInRow(M3Widgets.ComboHeight, ImGui.GetFrameHeight());
-                if (M3Widgets.IconButton("##add", FontAwesomeIcon.Plus, "Add the chosen item at the end of the list", M3ButtonStyle.Tonal,
+                if (M3Widgets.IconButton("##add", FontAwesomeIcon.Plus, "将选中的物品添加到清单末尾", M3ButtonStyle.Tonal,
                         diameter: ImGui.GetFrameHeight(), enabled: _autoGatherListsCache.NewGatherableIdx < gatherables.Count))
                 {
                     _plugin.AutoGatherListsManager.AddItem(list, gatherables[_autoGatherListsCache.NewGatherableIdx]);
@@ -593,7 +593,7 @@ public partial class Interface
             filteringItems ? M3Text.ColorOf(M3TextStyle.Faint) : hovered ? M3.Scheme.OnSurface : M3.Scheme.OnSurfaceVariant);
         if (filteringItems)
         {
-            M3Tooltip.Hovered("Clear the search to reorder items.");
+            M3Tooltip.Hovered("清空搜索后即可调整物品顺序。");
             return;
         }
 
@@ -626,7 +626,7 @@ public partial class Interface
         var enabled = GatherBuddy.AutoGather.Enabled;
         var status = GatherBuddy.AutoGather.AutoStatus;
         var compact = GatherBuddy.Config.UiDescriptionTooltips;
-        if (M3Widgets.RowSwitch(compact ? $"Auto-Gather: {status}###auto_gather_enabled" : "Auto-Gather###auto_gather_enabled", ref enabled,
+        if (M3Widgets.RowSwitch(compact ? $"自动采集：{status}###auto_gather_enabled" : "自动采集###auto_gather_enabled", ref enabled,
                 compact ? null : $"Status: {status}"))
         {
             GatherBuddy.AutoGather.Enabled = enabled;
@@ -687,7 +687,7 @@ public partial class Interface
             }
             else
             {
-                M3Widgets.EmptyState("##noList", "No list selected", "Pick a list on the left, or create one.", FontAwesomeIcon.Robot);
+                M3Widgets.EmptyState("##noList", "未选择清单", "在左侧选择一个清单，或新建清单。", FontAwesomeIcon.Robot);
             }
         });
     }

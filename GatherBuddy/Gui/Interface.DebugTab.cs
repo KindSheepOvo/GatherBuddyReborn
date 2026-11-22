@@ -417,7 +417,7 @@ public partial class Interface
             return;
         }
 
-        ImGui.Text($"Remote Task State (Upload): {_plugin.FishRecorder.RemoteRecordsUploadTask.Status}");
+        ImGui.Text($"远程任务状态（上传）：{_plugin.FishRecorder.RemoteRecordsUploadTask.Status}");
         if (ImGui.Button("Force Cancellation"))
         {
             _plugin.FishRecorder.StopRemoteRecordsRequests();
@@ -682,7 +682,7 @@ public partial class Interface
             return;
         }
 
-        ImGui.TextUnformatted($"Waymark Manager: 0x{GatherBuddy.WaymarkManager.Address:X}");
+        ImGui.TextUnformatted($"标记管理器：0x{GatherBuddy.WaymarkManager.Address:X}");
         var baseAddr = System.Diagnostics.Process.GetCurrentProcess().MainModule?.BaseAddress ?? IntPtr.Zero;
         ImGui.TextUnformatted(
             $"Waymark Manager Offset: +0x{(ulong)GatherBuddy.WaymarkManager.Address - (ulong)baseAddr:X}");
@@ -1139,7 +1139,7 @@ public partial class Interface
         if (ImGui.CollapsingHeader("World Objects"))
         {
             using var group = ImRaii.Group();
-            ImGui.Text("Gatherables within 200 yalms");
+            ImGui.Text("200 星码内的采集点");
             foreach (var obj in Dalamud.Objects)
             {
                 if (obj.ObjectKind != ObjectKind.GatheringPoint)
@@ -1163,7 +1163,7 @@ public partial class Interface
         if (ImGui.CollapsingHeader("Saved World Objects"))
         {
             using var group = ImRaii.Group();
-            ImGui.Text("Saved Gatherables");
+            ImGui.Text("已保存的采集点");
             foreach (var kvp in WorldData.WorldLocationsByNodeId)
             {
                 ImGui.PushID(kvp.Key.ToString());
@@ -1192,27 +1192,27 @@ public partial class Interface
             GatherBuddy.AutoGather.DebugClearVisited();
         }
 
-        ImGui.Text($"Enabled: {GatherBuddy.AutoGather.Enabled}");
-        ImGui.Text($"Status: {GatherBuddy.AutoGather.AutoStatus}");
-        ImGui.Text($"Current Destination: {GatherBuddy.AutoGather.CurrentDestination}");
-        ImGui.Text($"IsGathering: {AutoGather.AutoGather.IsGathering}");
-        ImGui.Text($"IsPathing: {AutoGather.AutoGather.IsPathing}");
-        ImGui.Text($"IsPathGenerating: {GatherBuddy.AutoGather.IsPathGenerating}");
-        ImGui.Text($"NavReady: {AutoGather.AutoGather.NavReady}");
-        ImGui.Text($"CanAct: {AutoGather.AutoGather.CanAct}");
-        ImGui.Text($"BlacklistedNodes: {GatherBuddy.Config.AutoGatherConfig.BlacklistedNodesByTerritoryId.Count}");
-        ImGui.Text($"ItemsToGatherInZone: {CountItems(GatherBuddy.AutoGather.ItemsToGatherInZone)}");
-        ImGui.Text($"ItemsToGather: {CountItems(GatherBuddy.AutoGather.ItemsToGather)}");
-        ImGui.Text($"ShouldUseFlag: {AutoGather.AutoGather.ShouldUseFlag}");
-        ImGui.Text($"LastIntegrity: {GatherBuddy.AutoGather.LastIntegrity}");
-        ImGui.Text($"LastCollectScore: {GatherBuddy.AutoGather.LastCollectability}");
-        ImGui.Text($"IsCordialOnCooldown: {GatherBuddy.AutoGather.IsCordialOnCooldown}");
+        ImGui.Text($"已启用：{GatherBuddy.AutoGather.Enabled}");
+        ImGui.Text($"状态：{GatherBuddy.AutoGather.AutoStatus}");
+        ImGui.Text($"当前目的地：{GatherBuddy.AutoGather.CurrentDestination}");
+        ImGui.Text($"正在采集：{AutoGather.AutoGather.IsGathering}");
+        ImGui.Text($"正在寻路：{AutoGather.AutoGather.IsPathing}");
+        ImGui.Text($"正在生成路径：{GatherBuddy.AutoGather.IsPathGenerating}");
+        ImGui.Text($"导航已就绪：{AutoGather.AutoGather.NavReady}");
+        ImGui.Text($"可行动：{AutoGather.AutoGather.CanAct}");
+        ImGui.Text($"黑名单采集点：{GatherBuddy.Config.AutoGatherConfig.BlacklistedNodesByTerritoryId.Count}");
+        ImGui.Text($"区域待采集物品：{CountItems(GatherBuddy.AutoGather.ItemsToGatherInZone)}");
+        ImGui.Text($"待采集物品：{CountItems(GatherBuddy.AutoGather.ItemsToGather)}");
+        ImGui.Text($"使用采集标记：{AutoGather.AutoGather.ShouldUseFlag}");
+        ImGui.Text($"上一次的耐久：{GatherBuddy.AutoGather.LastIntegrity}");
+        ImGui.Text($"上一次的收藏价值：{GatherBuddy.AutoGather.LastCollectability}");
+        ImGui.Text($"强心剂冷却中：{GatherBuddy.AutoGather.IsCordialOnCooldown}");
         //ImGui.Text($"IsFoodBuffUp: {GatherBuddy.AutoGather.GetIsFoodBuffUp()}");
         //ImGui.Text($"IsPotionBuffUp: {GatherBuddy.AutoGather.GetIsPotionBuffUp()}");
-        ImGui.Text($"IsManualBuffUp: {AutoGather.AutoGather.IsManualBuffUp}");
+        ImGui.Text($"指导书效果中：{AutoGather.AutoGather.IsManualBuffUp}");
         //ImGui.Text($"IsSquadronManualBuffUp: {GatherBuddy.AutoGather.GetIsSquadronManualBuffUp()}");
         //ImGui.Text($"IsSquadronPassBuffUp: {GatherBuddy.AutoGather.GetIsSquadronPassBuffUp()}");
-        ImGui.Text($"SortingMethodType: {GatherBuddy.Config.AutoGatherConfig.SortingMethod.ToString()}");
+        ImGui.Text($"排序方式：{GatherBuddy.Config.AutoGatherConfig.SortingMethod.ToString()}");
 
         unsafe
         {
@@ -1368,7 +1368,7 @@ public partial class Interface
         }
         ImGui.PopItemWidth();
 
-        if (!M3Widgets.Button("##copyUnknown", "Copy most recent unknown fish data", M3ButtonStyle.Tonal, FontAwesomeIcon.Copy))
+        if (!M3Widgets.Button("##copyUnknown", "复制最近的未知鱼类数据", M3ButtonStyle.Tonal, FontAwesomeIcon.Copy))
         {
             return;
         }

@@ -201,7 +201,7 @@ public class ItemSelector<T>
         => ImGui.GetIO().KeyCtrl;
 
     protected virtual string DeleteButtonTooltip()
-        => "Delete the selected entry. Hold Control while clicking.";
+        => "按住 Ctrl 点击以删除选中条目。";
 
     protected static bool ListRow(string label, bool selected, bool dimmed = false)
     {
@@ -255,7 +255,7 @@ public class ItemSelector<T>
                     ImGui.SetDragDropPayload(MoveLabel, null, 0);
                 }
 
-                ImGui.TextUnformatted($"Moving entry {idx + 1}");
+                ImGui.TextUnformatted($"正在移动第 {idx + 1} 项");
             }
         }
 
@@ -317,7 +317,7 @@ public class ItemSelector<T>
         }
 
         var filter = Filter;
-        if (M3Widgets.SearchField("##filter", "Search", ref filter, width) && filter != Filter)
+        if (M3Widgets.SearchField("##filter", "搜索", ref filter, width) && filter != Filter)
         {
             Filter = filter;
             FilterDirty = true;
@@ -356,7 +356,7 @@ public class ItemSelector<T>
         if (_flags.HasFlag(Flags.Add))
         {
             Next();
-            if (M3Widgets.IconButton("##add", FontAwesomeIcon.Plus, "Add a new entry", M3ButtonStyle.Tonal, diameter: size))
+            if (M3Widgets.IconButton("##add", FontAwesomeIcon.Plus, "添加新条目", M3ButtonStyle.Tonal, diameter: size))
             {
                 OpenNameDialog(NameAction.Add);
             }
@@ -365,7 +365,7 @@ public class ItemSelector<T>
         if (_flags.HasFlag(Flags.Import))
         {
             Next();
-            if (M3Widgets.IconButton("##import", FontAwesomeIcon.Paste, "Import an entry from your clipboard", diameter: size))
+            if (M3Widgets.IconButton("##import", FontAwesomeIcon.Paste, "从剪贴板导入条目", diameter: size))
             {
                 OpenNameDialog(NameAction.Import);
             }
@@ -374,7 +374,7 @@ public class ItemSelector<T>
         if (_flags.HasFlag(Flags.Duplicate))
         {
             Next();
-            if (M3Widgets.IconButton("##duplicate", FontAwesomeIcon.Clone, "Duplicate the selected entry", diameter: size,
+            if (M3Widgets.IconButton("##duplicate", FontAwesomeIcon.Clone, "复制选中条目", diameter: size,
                     enabled: CurrentIdx >= 0))
             {
                 OpenNameDialog(NameAction.Duplicate);
@@ -408,12 +408,12 @@ public class ItemSelector<T>
     {
         var (headline, icon) = _nameAction switch
         {
-            NameAction.Import => ("Import from clipboard", FontAwesomeIcon.Paste),
-            NameAction.Duplicate => ("Duplicate entry", FontAwesomeIcon.Clone),
-            _ => ("New entry", FontAwesomeIcon.Plus),
+            NameAction.Import => ("从剪贴板导入", FontAwesomeIcon.Paste),
+            NameAction.Duplicate => ("复制条目", FontAwesomeIcon.Clone),
+            _ => ("新建条目", FontAwesomeIcon.Plus),
         };
 
-        using var dialog = M3Dialog.Begin("##name", headline, "Give it a name.", icon);
+        using var dialog = M3Dialog.Begin("##name", headline, "请为条目命名。", icon);
         if (!dialog.IsOpen)
         {
             return;
@@ -424,12 +424,12 @@ public class ItemSelector<T>
             ImGui.SetKeyboardFocusHere();
         }
 
-        M3Widgets.TextField("##newName", "Name", ref _newName, ImGui.GetContentRegionAvail().X, 128);
+        M3Widgets.TextField("##newName", "名称", ref _newName, ImGui.GetContentRegionAvail().X, 128);
         var submit = ImGui.IsKeyPressed(ImGuiKey.Enter) && _newName.Trim().Length > 0;
         var pressed = M3Dialog.Actions(
         [
-            new M3DialogAction("Cancel"),
-            new M3DialogAction(_nameAction == NameAction.Import ? "Import" : "Create", M3ButtonStyle.Filled, icon, _newName.Trim().Length > 0),
+            new M3DialogAction("取消"),
+            new M3DialogAction(_nameAction == NameAction.Import ? "导入" : "创建", M3ButtonStyle.Filled, icon, _newName.Trim().Length > 0),
         ]);
         if (pressed != 1 && !submit)
         {
@@ -457,7 +457,7 @@ public class ItemSelector<T>
         }
         else if (_nameAction == NameAction.Import)
         {
-            M3Snackbar.Show("The clipboard does not hold a valid entry.", severity: M3Severity.Error);
+            M3Snackbar.Show("剪贴板中没有有效条目。", severity: M3Severity.Error);
         }
 
         _nameAction = NameAction.None;

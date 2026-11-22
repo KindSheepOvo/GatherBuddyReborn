@@ -83,7 +83,7 @@ public partial class Interface
         {
             DrawToolbar();
             var search = _search;
-            if (M3Widgets.SearchField("##agSearch", "Search lists", ref search, ImGui.GetContentRegionAvail().X))
+            if (M3Widgets.SearchField("##agSearch", "搜索清单", ref search, ImGui.GetContentRegionAvail().X))
             {
                 _search = search;
             }
@@ -97,7 +97,7 @@ public partial class Interface
                     DrawFolderContents(FileSystem.Root);
                     if (FileSystem.Root.Children.Count == 0)
                     {
-                        M3Widgets.EmptyState("##agEmpty", "No lists yet", "Create one with the buttons above.", FontAwesomeIcon.Robot);
+                        M3Widgets.EmptyState("##agEmpty", "暂无清单", "点击上方按钮创建清单。", FontAwesomeIcon.Robot);
                     }
 
                     DrawRootDropZone();
@@ -109,19 +109,19 @@ public partial class Interface
 
         private void DrawToolbar()
         {
-            if (M3Widgets.IconButton("##agAddList", FontAwesomeIcon.Plus, "Create a new auto-gather list", M3ButtonStyle.Tonal))
+            if (M3Widgets.IconButton("##agAddList", FontAwesomeIcon.Plus, "新建自动采集清单", M3ButtonStyle.Tonal))
             {
                 OpenNameDialog(NewListDialogId, FileSystem.Root, string.Empty);
             }
 
             ImGui.SameLine(0, M3.Space1);
-            if (M3Widgets.IconButton("##agAddFolder", FontAwesomeIcon.FolderPlus, "Create a new folder"))
+            if (M3Widgets.IconButton("##agAddFolder", FontAwesomeIcon.FolderPlus, "新建文件夹"))
             {
                 OpenNameDialog(NewFolderDialogId, FileSystem.Root, string.Empty);
             }
 
             ImGui.SameLine(0, M3.Space1);
-            if (M3Widgets.IconButton("##agImport", FontAwesomeIcon.Paste, "Import an auto-gather list from your clipboard"))
+            if (M3Widgets.IconButton("##agImport", FontAwesomeIcon.Paste, "从剪贴板导入自动采集清单"))
             {
                 OpenNameDialog(ImportDialogId, FileSystem.Root, string.Empty);
             }
@@ -331,30 +331,30 @@ public partial class Interface
             }
 
             M3Menu.Heading(CheckUnnamed(list.Name));
-            if (M3Menu.Item("##toggle", list.Enabled ? "Disable" : "Enable", list.Enabled ? FontAwesomeIcon.Pause : FontAwesomeIcon.Play))
+            if (M3Menu.Item("##toggle", list.Enabled ? "禁用" : "启用", list.Enabled ? FontAwesomeIcon.Pause : FontAwesomeIcon.Play))
             {
                 Manager.ToggleList(list);
             }
 
-            if (M3Menu.Item("##up", "Move up", FontAwesomeIcon.ArrowUp))
+            if (M3Menu.Item("##up", "上移", FontAwesomeIcon.ArrowUp))
             {
                 Manager.MoveListUp(leaf);
             }
 
-            if (M3Menu.Item("##down", "Move down", FontAwesomeIcon.ArrowDown))
+            if (M3Menu.Item("##down", "下移", FontAwesomeIcon.ArrowDown))
             {
                 Manager.MoveListDown(leaf);
             }
 
             DrawMoveToMenu(leaf);
-            if (M3Menu.Item("##duplicate", "Duplicate", FontAwesomeIcon.Clone))
+            if (M3Menu.Item("##duplicate", "复制清单", FontAwesomeIcon.Clone))
             {
                 var clone = list.Clone();
                 clone.Name = $"{list.Name} (Copy)";
                 Manager.AddList(clone, leaf.Parent);
             }
 
-            if (M3Menu.Item("##export", "Copy to clipboard", FontAwesomeIcon.Copy))
+            if (M3Menu.Item("##export", "复制到剪贴板", FontAwesomeIcon.Copy))
             {
                 try
                 {
@@ -369,7 +369,7 @@ public partial class Interface
 
             DrawBaitBuyListMenu(list);
             M3Menu.Divider();
-            if (M3Menu.Item("##delete", "Delete", FontAwesomeIcon.Trash))
+            if (M3Menu.Item("##delete", "删除", FontAwesomeIcon.Trash))
             {
                 var folder = leaf.Parent;
                 Manager.DeleteList(list);
@@ -389,13 +389,13 @@ public partial class Interface
                 }
             }
 
-            using var sub = M3Menu.BeginSub("##moveTo", "Move to", FontAwesomeIcon.FolderOpen, folders.Count > 0 || !leaf.Parent.IsRoot);
+            using var sub = M3Menu.BeginSub("##moveTo", "移至", FontAwesomeIcon.FolderOpen, folders.Count > 0 || !leaf.Parent.IsRoot);
             if (!sub.IsOpen)
             {
                 return;
             }
 
-            if (!leaf.Parent.IsRoot && M3Menu.Item("##root", "Top level", FontAwesomeIcon.LevelUpAlt))
+            if (!leaf.Parent.IsRoot && M3Menu.Item("##root", "顶层", FontAwesomeIcon.LevelUpAlt))
             {
                 MoveInto(leaf, FileSystem.Root);
             }
@@ -419,23 +419,23 @@ public partial class Interface
             }
 
             M3Menu.Heading(folder.Name);
-            if (M3Menu.Item("##newList", "New list here", FontAwesomeIcon.Plus))
+            if (M3Menu.Item("##newList", "在此新建清单", FontAwesomeIcon.Plus))
             {
                 OpenNameDialog(NewListDialogId, folder, string.Empty);
             }
 
-            if (M3Menu.Item("##newFolder", "New subfolder", FontAwesomeIcon.FolderPlus))
+            if (M3Menu.Item("##newFolder", "新建子文件夹", FontAwesomeIcon.FolderPlus))
             {
                 OpenNameDialog(NewFolderDialogId, folder, string.Empty);
             }
 
-            if (M3Menu.Item("##rename", "Rename", FontAwesomeIcon.Pen))
+            if (M3Menu.Item("##rename", "重命名", FontAwesomeIcon.Pen))
             {
                 OpenNameDialog(RenameFolderDialogId, folder, folder.Name);
             }
 
             M3Menu.Divider();
-            if (M3Menu.Item("##delete", "Delete folder", FontAwesomeIcon.Trash))
+            if (M3Menu.Item("##delete", "删除文件夹", FontAwesomeIcon.Trash))
             {
                 _dialogFolder = folder;
                 _openDialog = DeleteFolderDialogId;
@@ -493,7 +493,7 @@ public partial class Interface
 
                 if (!AutoGatherList.Config.FromBase64(clipboard, out var cfg))
                 {
-                    M3Snackbar.Show("The clipboard does not hold an auto-gather list.", severity: M3Severity.Error);
+                    M3Snackbar.Show("剪贴板中没有自动采集清单。", severity: M3Severity.Error);
                     return;
                 }
 
@@ -522,7 +522,7 @@ public partial class Interface
                 ImGui.SetKeyboardFocusHere();
             }
 
-            M3Widgets.TextField("##name", "Name", ref _dialogName, ImGui.GetContentRegionAvail().X, 128);
+            M3Widgets.TextField("##name", "名称", ref _dialogName, ImGui.GetContentRegionAvail().X, 128);
             var name = _dialogName.Trim();
             var submit = name.Length > 0 && ImGui.IsKeyPressed(ImGuiKey.Enter);
             var pressed = M3Dialog.Actions(
@@ -575,7 +575,7 @@ public partial class Interface
             var result = BuildVendorBuyListGenerationResult(list, vendorBuyListManager);
             var canOpenMenu = vendorBuyListManager != null && vendorBuyListWindow != null && result.VendorDataReady && result.AllBaitNames.Count > 0;
 
-            using var sub = M3Menu.BeginSub("##baitBuyList", "Make bait buy list", FontAwesomeIcon.ShoppingCart, canOpenMenu);
+            using var sub = M3Menu.BeginSub("##baitBuyList", "制作鱼饵购买清单", FontAwesomeIcon.ShoppingCart, canOpenMenu);
             if (!canOpenMenu)
             {
                 M3Tooltip.Hovered(vendorBuyListManager == null || vendorBuyListWindow == null
@@ -592,12 +592,12 @@ public partial class Interface
                 return;
             }
 
-            if (M3Menu.Item("##createNew", "Create a new buy list", FontAwesomeIcon.Plus, result.Targets.Count > 0))
+            if (M3Menu.Item("##createNew", "新建购买清单", FontAwesomeIcon.Plus, result.Targets.Count > 0))
             {
                 OpenCreateVendorBuyListPopup(list, result, vendorBuyListWindow!);
             }
 
-            using (var existing = M3Menu.BeginSub("##addExisting", "Add to a buy list", FontAwesomeIcon.ListUl,
+            using (var existing = M3Menu.BeginSub("##addExisting", "添加到购买清单", FontAwesomeIcon.ListUl,
                        result.Targets.Count > 0 && VendorBuyListManager.Lists.Count > 0))
             {
                 if (existing.IsOpen)
@@ -616,7 +616,7 @@ public partial class Interface
             if (result.SkippedBaitNames.Count > 0)
             {
                 M3Menu.Divider();
-                if (M3Menu.Item("##skipped", "Show baits vendors don't sell", FontAwesomeIcon.InfoCircle))
+                if (M3Menu.Item("##skipped", "显示商人不出售的鱼饵", FontAwesomeIcon.InfoCircle))
                 {
                     OpenSkippedBaitPopup(list, result);
                 }
@@ -730,7 +730,7 @@ public partial class Interface
         private void DrawBaitBuyListResultDialog()
         {
             var state = _baitBuyListResultPopup;
-            using var dialog = M3Dialog.Begin(BaitResultDialogId, "Baits to get yourself", state?.Summary, FontAwesomeIcon.ShoppingCart, 460f);
+            using var dialog = M3Dialog.Begin(BaitResultDialogId, "需要自行获取的鱼饵", state?.Summary, FontAwesomeIcon.ShoppingCart, 460f);
             if (!dialog.IsOpen)
             {
                 return;

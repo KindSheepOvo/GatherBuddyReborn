@@ -35,7 +35,7 @@ public partial class VulcanWindow
     {
         var skipUnusable = GatherBuddy.Config.SkipMacroStepIfUnable;
         if (M3Widgets.LabeledCheckbox("Skip a step that can't be used##skipUnusable", ref skipUnusable,
-                tooltip: "When a macro step can't be used right now, go on with the next one instead of stopping."))
+                tooltip: "当前无法执行某一步时，继续执行下一步而不是停止。"))
         {
             GatherBuddy.Config.SkipMacroStepIfUnable = skipUnusable;
             GatherBuddy.Config.Save();
@@ -44,7 +44,7 @@ public partial class VulcanWindow
         ImGui.SameLine(0, M3.Space3 * 2);
         var fallbackEnabled = GatherBuddy.Config.MacroFallbackEnabled;
         if (M3Widgets.LabeledCheckbox("Use the solver once a macro runs out##fallbackEnabled", ref fallbackEnabled,
-                tooltip: "When a macro ends before the craft is finished, let the solver finish it."))
+                tooltip: "宏结束时如果制作尚未完成，由求解器继续。"))
         {
             GatherBuddy.Config.MacroFallbackEnabled = fallbackEnabled;
             GatherBuddy.Config.Save();
@@ -86,14 +86,14 @@ public partial class VulcanWindow
     {
         using (ImRaii.PushFont(M3.TitleMedium))
         {
-            ImGui.TextUnformatted("Import a macro");
+            ImGui.TextUnformatted("导入宏");
         }
 
-        M3Text.Draw("Paste a crafting macro from Teamcraft or Artisan. /ac lines, plain one-action-per-line imports, and Artisan JSON exports are supported.",
+        M3Text.Draw("粘贴从 Teamcraft 或 Artisan 导出的制作宏。支持 /ac 指令、每行一条技能以及 Artisan JSON。",
             M3TextStyle.Muted, true);
         ImGui.Dummy(new Vector2(0, M3.Space2));
 
-        if (M3Widgets.Button("##browseTC", "Browse Teamcraft", M3ButtonStyle.Tonal, FontAwesomeIcon.Globe,
+        if (M3Widgets.Button("##browseTC", "浏览 Teamcraft", M3ButtonStyle.Tonal, FontAwesomeIcon.Globe,
                 tooltip: "Opens Teamcraft community rotations in a Browsingway overlay.\n\n"
                   + "Setup:\n"
                   + "1. Install the Browsingway plugin\n"
@@ -117,7 +117,7 @@ public partial class VulcanWindow
         }
 
         ImGui.SameLine(0, M3.Space2);
-        if (M3Widgets.Button("##hideTC", "Hide overlay", M3ButtonStyle.Text, FontAwesomeIcon.EyeSlash))
+        if (M3Widgets.Button("##hideTC", "隐藏浮层", M3ButtonStyle.Text, FontAwesomeIcon.EyeSlash))
         {
             try
             {
@@ -132,9 +132,9 @@ public partial class VulcanWindow
 
         ImGui.Dummy(new Vector2(0, M3.Space2));
         var width = ImGui.GetContentRegionAvail().X;
-        M3Widgets.TextField("##macroName", "Macro name", ref _inGameMacroName, width, 100);
+        M3Widgets.TextField("##macroName", "宏名称", ref _inGameMacroName, width, 100);
         ImGui.Dummy(new Vector2(0, M3.Space1));
-        M3Widgets.SectionLabel("Macro text");
+        M3Widgets.SectionLabel("宏文本");
         using (ImRaii.PushStyle(ImGuiStyleVar.FrameRounding, M3.ShapeExtraSmall)
                    .Push(ImGuiStyleVar.FramePadding, new Vector2(M3.Space3, M3.Space2)))
         using (ImRaii.PushColor(ImGuiCol.FrameBg, M3.Scheme.SurfaceContainerHighest))
@@ -143,7 +143,7 @@ public partial class VulcanWindow
         }
 
         ImGui.Dummy(new Vector2(0, M3.Space1));
-        if (M3Widgets.Button("##parseBtn", "Parse and preview", M3ButtonStyle.Filled, FontAwesomeIcon.Eye,
+        if (M3Widgets.Button("##parseBtn", "解析并预览", M3ButtonStyle.Filled, FontAwesomeIcon.Eye,
                 enabled: !string.IsNullOrWhiteSpace(_inGameMacroText)))
         {
             ParseInGameMacro();
@@ -164,8 +164,8 @@ public partial class VulcanWindow
 
     private static void DrawBrowsingwayErrorDialog()
     {
-        using var dialog = M3Dialog.Begin(BrowsingwayErrorDialogId, "Browsingway isn't available",
-            "The Browsingway plugin was not found or is not loaded. You can browse Teamcraft in your web browser and paste macros here.",
+        using var dialog = M3Dialog.Begin(BrowsingwayErrorDialogId, "Browsingway 不可用",
+            "找不到 Browsingway 插件或插件尚未加载。你可以在浏览器中打开 Teamcraft，再把宏粘贴到这里。",
             FontAwesomeIcon.ExclamationTriangle);
         if (dialog.IsOpen)
         {
@@ -175,8 +175,8 @@ public partial class VulcanWindow
 
     private void DrawInGameMacroPreview(UserMacro macro)
     {
-        using var card = M3Card.Begin("##macroPreview", "Preview", FontAwesomeIcon.Eye, M3.AccentFor(2), subtitle: $"{macro.Name}, {macro.Actions.Count} actions");
-        M3Text.Draw("Minimum stats, optional", M3TextStyle.Label);
+        using var card = M3Card.Begin("##macroPreview", "预览", FontAwesomeIcon.Eye, M3.AccentFor(2), subtitle: $"{macro.Name}，{macro.Actions.Count} 个技能");
+        M3Text.Draw("最低属性（可选）", M3TextStyle.Label);
         M3Widgets.RowNumber("Craftsmanship##previewMinCraft", ref _previewMinCraft, 10, 0);
         M3Widgets.RowNumber("Control##previewMinCtrl", ref _previewMinCtrl, 10, 0);
         M3Widgets.RowNumber("CP##previewMinCP", ref _previewMinCP, 5, 0);
@@ -184,7 +184,7 @@ public partial class VulcanWindow
         _previewMinCtrl = Math.Max(0, _previewMinCtrl);
         _previewMinCP = Math.Max(0, _previewMinCP);
 
-        if (M3Widgets.Button("##importInGameBtn", "Import", M3ButtonStyle.Filled, FontAwesomeIcon.FileImport))
+        if (M3Widgets.Button("##importInGameBtn", "导入", M3ButtonStyle.Filled, FontAwesomeIcon.FileImport))
         {
             macro.MinCraftsmanship = _previewMinCraft;
             macro.MinControl = _previewMinCtrl;
@@ -193,7 +193,7 @@ public partial class VulcanWindow
         }
 
         ImGui.SameLine(0, M3.Space2);
-        if (M3Widgets.Button("##cancelInGameBtn", "Cancel", M3ButtonStyle.Text))
+        if (M3Widgets.Button("##cancelInGameBtn", "取消", M3ButtonStyle.Text))
         {
             _previewInGameMacro = null;
             _inGameMacroError = null;
@@ -211,7 +211,7 @@ public partial class VulcanWindow
 
             if (macro == null || macro.Actions.Count == 0)
             {
-                _inGameMacroError = "Failed to parse macro. Ensure it contains recognizable crafting action names or a supported Artisan JSON export.";
+                _inGameMacroError = "解析宏失败。请确认包含可识别的制作技能名称，或是受支持的 Artisan JSON 导出。";
             }
             else
             {
@@ -223,7 +223,7 @@ public partial class VulcanWindow
         }
         catch (Exception ex)
         {
-            _inGameMacroError = $"Failed to parse macro: {ex.Message}";
+            _inGameMacroError = $"解析宏失败：{ex.Message}";
             GatherBuddy.Log.Error($"Failed to parse in-game macro: {ex.Message}");
         }
     }
@@ -245,7 +245,7 @@ public partial class VulcanWindow
         }
         catch (Exception ex)
         {
-            _inGameMacroError = $"Failed to import macro: {ex.Message}";
+            _inGameMacroError = $"导入宏失败：{ex.Message}";
             GatherBuddy.Log.Error($"Failed to import in-game macro: {ex.Message}");
         }
     }
@@ -253,10 +253,10 @@ public partial class VulcanWindow
 
     private void DrawMacroListPanel()
     {
-        M3Widgets.SearchField("##macroSearch", "Search macros", ref _macroSearch, ImGui.GetContentRegionAvail().X - M3Widgets.IconButtonSize - M3.Space1);
+        M3Widgets.SearchField("##macroSearch", "搜索宏", ref _macroSearch, ImGui.GetContentRegionAvail().X - M3Widgets.IconButtonSize - M3.Space1);
         ImGui.SameLine(0, M3.Space1);
         Ui.CenterInRow(ImGui.GetItemRectSize().Y, M3Widgets.IconButtonSize);
-        if (M3Widgets.IconButton("##newImport", FontAwesomeIcon.Plus, "Import a macro", M3ButtonStyle.Tonal))
+        if (M3Widgets.IconButton("##newImport", FontAwesomeIcon.Plus, "导入宏", M3ButtonStyle.Tonal))
         {
             _selectedMacroId = null;
         }
@@ -266,7 +266,7 @@ public partial class VulcanWindow
         var allMacros = macroLibrary.GetAllMacros();
         if (allMacros.Count == 0)
         {
-            M3Widgets.EmptyState("##noMacros", "No macros yet", "Import one with the panel on the right.", FontAwesomeIcon.Scroll);
+            M3Widgets.EmptyState("##noMacros", "暂无宏", "通过右侧面板导入一个宏。", FontAwesomeIcon.Scroll);
             return;
         }
 
@@ -277,7 +277,7 @@ public partial class VulcanWindow
 
         if (filtered.Count == 0)
         {
-            M3Text.Draw("No macros match your search.", M3TextStyle.Faint);
+            M3Text.Draw("未找到匹配的宏。", M3TextStyle.Faint);
             return;
         }
 
@@ -323,11 +323,11 @@ public partial class VulcanWindow
                 ImGui.TextUnformatted(macro.Name);
             }
 
-            M3Text.Draw(string.IsNullOrEmpty(macro.Author) ? macro.Source : $"by {macro.Author}", M3TextStyle.Muted);
+            M3Text.Draw(string.IsNullOrEmpty(macro.Author) ? macro.Source : $"作者：{macro.Author}", M3TextStyle.Muted);
         }
 
         ImGui.SetCursorScreenPos(new Vector2(ImGui.GetWindowPos().X + ImGui.GetWindowContentRegionMax().X - M3Widgets.IconButtonSize, start.Y));
-        if (M3Widgets.IconButton("##closeDetail", FontAwesomeIcon.Times, "Close"))
+        if (M3Widgets.IconButton("##closeDetail", FontAwesomeIcon.Times, "关闭"))
         {
             _selectedMacroId = null;
         }
@@ -341,8 +341,8 @@ public partial class VulcanWindow
             _editingMacroMinCP = macro.MinCP;
         }
 
-        using (M3Card.Begin("##macroStats", "Minimum stats", FontAwesomeIcon.ChartBar, M3.AccentFor(0),
-                   subtitle: $"Created {macro.CreatedAt.ToLocalTime():yyyy-MM-dd HH:mm}"))
+        using (M3Card.Begin("##macroStats", "最低属性", FontAwesomeIcon.ChartBar, M3.AccentFor(0),
+                   subtitle: $"创建于 {macro.CreatedAt.ToLocalTime():yyyy-MM-dd HH:mm}"))
         {
             M3Widgets.RowNumber("Craftsmanship##editMinCraft", ref _editingMacroMinCraft, 10, 0);
             M3Widgets.RowNumber("Control##editMinCtrl", ref _editingMacroMinCtrl, 10, 0);
@@ -351,7 +351,7 @@ public partial class VulcanWindow
             _editingMacroMinCtrl = Math.Max(0, _editingMacroMinCtrl);
             _editingMacroMinCP = Math.Max(0, _editingMacroMinCP);
             var changed = _editingMacroMinCraft != macro.MinCraftsmanship || _editingMacroMinCtrl != macro.MinControl || _editingMacroMinCP != macro.MinCP;
-            if (M3Widgets.Button("##saveStats", "Save", M3ButtonStyle.Filled, FontAwesomeIcon.Save, enabled: changed))
+            if (M3Widgets.Button("##saveStats", "保存", M3ButtonStyle.Filled, FontAwesomeIcon.Save, enabled: changed))
             {
                 macro.MinCraftsmanship = _editingMacroMinCraft;
                 macro.MinControl = _editingMacroMinCtrl;
@@ -359,16 +359,16 @@ public partial class VulcanWindow
                 MacroValidator.InvalidateByMacroId(macro.Id);
                 macroLibrary.Save();
                 GatherBuddy.Log.Debug($"[MacrosTab] Saved min stats for macro '{macro.Name}'");
-                M3Snackbar.Show("Saved the minimum stats.");
+                M3Snackbar.Show("已保存最低属性。");
             }
 
             if (!string.IsNullOrEmpty(macro.TeamcraftUrl))
             {
-                M3Widgets.RowCopy("Teamcraft link", macro.TeamcraftUrl, iconOnly: true);
+                M3Widgets.RowCopy("Teamcraft 链接", macro.TeamcraftUrl, iconOnly: true);
             }
         }
 
-        M3Widgets.SectionLabel($"Actions ({macro.Actions.Count})");
+        M3Widgets.SectionLabel($"技能（{macro.Actions.Count}）");
         var actionIconSize = VulcanUiScaling.Scaled(24f);
         using (var actions = ImRaii.Child("##macroActions", new Vector2(-1, ImGui.GetContentRegionAvail().Y - M3Widgets.ButtonHeight - M3.Space2), false))
         {
@@ -395,13 +395,13 @@ public partial class VulcanWindow
             }
         }
 
-        if (M3Widgets.HoldButton($"##deleteMacro_{macro.Id}", "Delete macro", 1f, M3ButtonStyle.Danger, FontAwesomeIcon.Trash,
-                tooltip: "Press and hold to delete this macro."))
+        if (M3Widgets.HoldButton($"##deleteMacro_{macro.Id}", "删除宏", 1f, M3ButtonStyle.Danger, FontAwesomeIcon.Trash,
+                tooltip: "长按删除此宏。"))
         {
             macroLibrary.RemoveMacro(macro.Id);
             _selectedMacroId = null;
             GatherBuddy.Log.Debug($"[MacrosTab] Deleted macro '{macro.Name}'");
-            M3Snackbar.Show($"Deleted {macro.Name}.");
+            M3Snackbar.Show($"已删除 {macro.Name}。");
         }
     }
     private uint GetSkillIconId(uint skillId)

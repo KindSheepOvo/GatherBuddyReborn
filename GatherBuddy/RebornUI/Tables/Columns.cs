@@ -13,6 +13,8 @@ namespace GatherBuddy.RebornUI.Tables;
 public class Column<TItem>
 {
     public string Label = string.Empty;
+    public string? LocalizedLabel { get; init; }
+    public string DisplayLabel => LocalizedLabel ?? Label;
     public ImGuiTableColumnFlags Flags = ImGuiTableColumnFlags.NoResize;
 
     public virtual float Width
@@ -23,7 +25,7 @@ public class Column<TItem>
 
     public virtual bool DrawFilter()
     {
-        TableFilter.HeaderLabel(Label);
+        TableFilter.HeaderLabel(DisplayLabel);
         return false;
     }
 
@@ -63,7 +65,7 @@ public class ColumnString<TItem> : Column<TItem>
     public override bool DrawFilter()
     {
         var value = FilterValue;
-        if (!TableFilter.Text(FilterLabel, Label, ref value, TableFilter.CellWidth) || value == FilterValue)
+        if (!TableFilter.Text(FilterLabel, DisplayLabel, ref value, TableFilter.CellWidth) || value == FilterValue)
         {
             return false;
         }
@@ -188,7 +190,7 @@ public class ColumnFlags<T, TItem> : Column<TItem> where T : struct, Enum
     {
         using var id = ImRaii.PushId(FilterLabel);
         var all = FilterValue.HasFlag(AllFlags);
-        if (TableFilter.Button("##filter", Label, !all, TableFilter.CellWidth, out var cleared))
+        if (TableFilter.Button("##filter", DisplayLabel, !all, TableFilter.CellWidth, out var cleared))
         {
             ImGui.OpenPopup("##menu");
         }
@@ -206,7 +208,7 @@ public class ColumnFlags<T, TItem> : Column<TItem> where T : struct, Enum
         }
 
         var ret = false;
-        if (TableFilter.MenuCheckbox("Show all", ref all))
+        if (TableFilter.MenuCheckbox("全部启用###Show all", ref all))
         {
             SetValue(AllFlags, all);
             ret = true;
@@ -264,7 +266,7 @@ public abstract class TriStateColumnFlags<T, TItem> : Column<TItem> where T : st
     {
         using var id = ImRaii.PushId(FilterLabel);
         var all = FilterValue.HasFlag(AllFlags);
-        if (TableFilter.Button("##filter", Label, !all, TableFilter.CellWidth, out var cleared))
+        if (TableFilter.Button("##filter", DisplayLabel, !all, TableFilter.CellWidth, out var cleared))
         {
             ImGui.OpenPopup("##menu");
         }

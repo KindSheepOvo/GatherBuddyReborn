@@ -652,14 +652,14 @@ public class CraftingListEditor
         if (_isGeneratingQueue)
         {
             M3Widgets.LinearProgressIndeterminate(new Vector2(0f, 4f * M3.Scale));
-            M3Text.Draw("Working out the craft queue...", M3TextStyle.Muted);
+            M3Text.Draw("正在计算制作队列…", M3TextStyle.Muted);
             return;
         }
 
         var displayRows = GetDisplayQueueRows(planningList, activeExecutionPlan);
         if (displayRows.Count == 0)
         {
-            M3Text.Draw("The queue is empty.", M3TextStyle.Muted);
+            M3Text.Draw("制作队列为空。", M3TextStyle.Muted);
             return;
         }
 
@@ -685,7 +685,7 @@ public class CraftingListEditor
         M3Widgets.Divider(4f);
         if (IPCSubscriber.IsReady("Artisan"))
         {
-            M3Widgets.Button("##queue_start", "Artisan detected", M3ButtonStyle.Filled, FontAwesomeIcon.Ban, width, false, ArtisanLoadedTooltip);
+            M3Widgets.Button("##queue_start", "检测到 Artisan", M3ButtonStyle.Filled, FontAwesomeIcon.Ban, width, false, ArtisanLoadedTooltip);
         }
         else
         {
@@ -697,7 +697,7 @@ public class CraftingListEditor
                 : warnings > 0
                     ? $"{warnings} macro(s) have warnings."
                     : "Gather anything that's missing, then craft the queue.";
-            if (M3Widgets.Button("##queue_start", "Gather & craft", style, FontAwesomeIcon.Play, width, tooltip: tooltip, accent: accent))
+            if (M3Widgets.Button("##queue_start", "采集并制作", style, FontAwesomeIcon.Play, width, tooltip: tooltip, accent: accent))
             {
                 if (hardFails > 0)
                 {
@@ -714,7 +714,7 @@ public class CraftingListEditor
 
         var gap = M3.Space1;
         var third = MathF.Floor((width - gap * 2f) / 3f);
-        if (ToolButton("##queue_gather_list", "Gather list", FontAwesomeIcon.Leaf, third, M3ButtonStyle.Outlined,
+        if (ToolButton("##queue_gather_list", "采集清单", FontAwesomeIcon.Leaf, third, M3ButtonStyle.Outlined,
                 "Make a gather list from this list's materials"))
         {
             var materials = new Dictionary<uint, int>(GetCachedMaterials());
@@ -726,7 +726,7 @@ public class CraftingListEditor
         ImGui.SameLine(0, gap);
         var materialsWindow = GatherBuddy.CraftingMaterialsWindow;
         var materialsShown = materialsWindow is { IsOpen: true, IsMinimized: false };
-        if (ToolButton("##queue_materials", "Materials", FontAwesomeIcon.Boxes, third,
+        if (ToolButton("##queue_materials", "材料", FontAwesomeIcon.Boxes, third,
                 materialsShown ? M3ButtonStyle.Tonal : M3ButtonStyle.Outlined,
                 materialsShown ? "Hide the materials window" : "Show what this list needs")
          && materialsWindow != null)
@@ -745,7 +745,7 @@ public class CraftingListEditor
         ImGui.SameLine(0, gap);
         var treeWindow = GatherBuddy.CraftingTreeWindow;
         var treeShown = treeWindow is { IsOpen: true, IsMinimized: false };
-        if (ToolButton("##queue_tree", "Tree", FontAwesomeIcon.Sitemap, MathF.Max(1f, width - third * 2f - gap * 2f),
+        if (ToolButton("##queue_tree", "制作树", FontAwesomeIcon.Sitemap, MathF.Max(1f, width - third * 2f - gap * 2f),
                 treeShown ? M3ButtonStyle.Tonal : M3ButtonStyle.Outlined,
                 treeShown ? "Hide the crafting tree" : "Show how the recipes break down")
          && treeWindow != null)
@@ -835,7 +835,7 @@ public class CraftingListEditor
 
         if (_nameConflict)
         {
-            M3Text.Draw("A list with that name already exists.", M3TextStyle.Error);
+            M3Text.Draw("已存在同名清单。", M3TextStyle.Error);
         }
 
         ImGui.Dummy(new Vector2(0f, M3.Space1));
@@ -848,14 +848,14 @@ public class CraftingListEditor
         var flow = new M3Flow(M3.Space1, width);
         flow.Next(M3Widgets.ButtonWidth(FontAwesomeIcon.Copy, exportLabel));
         if (M3Widgets.Button("##exportList", exportLabel, M3ButtonStyle.Text, FontAwesomeIcon.Copy,
-                tooltip: "Copy GatherBuddy's list export string to the clipboard."))
+                tooltip: "将 GatherBuddy 清单的导出字符串复制到剪贴板。"))
         {
             VulcanWindow.CopyListExport(_list);
         }
 
         flow.Next(M3Widgets.ButtonWidth(FontAwesomeIcon.Link, teamCraftLabel));
         if (M3Widgets.Button("##teamCraftExport", teamCraftLabel, M3ButtonStyle.Text, FontAwesomeIcon.Link,
-                tooltip: "Copy a TeamCraft import link built from this list's recipes."))
+                tooltip: "将此清单配方的 TeamCraft 导入链接复制到剪贴板。"))
         {
             VulcanWindow.CopyTeamCraftLink(_list);
         }
@@ -1047,7 +1047,7 @@ public class CraftingListEditor
         }
 
         ImGui.Dummy(new Vector2(0f, M3.Space1));
-        if (M3Widgets.Button("##editConsumables", "Edit consumables & macros", M3ButtonStyle.Tonal, FontAwesomeIcon.Pen))
+        if (M3Widgets.Button("##editConsumables", "编辑消耗品和宏", M3ButtonStyle.Tonal, FontAwesomeIcon.Pen))
         {
             _consumablesPopup.OpenListDefaults(_list);
         }
@@ -1061,14 +1061,14 @@ public class CraftingListEditor
         ImGui.Dummy(new Vector2(0f, M3.Space1));
 
         M3Widgets.NumberField("##quantity", ref _searchQuantity, M3Widgets.NumberFieldWidth(true), 1, 1);
-        M3Tooltip.Hovered("How many times to craft it");
+        M3Tooltip.Hovered("制作次数");
         ImGui.SameLine(0, M3.Space2);
 
         var canAdd = _selectedRecipe != null;
         var tooltip = canAdd
             ? $"Add {_recipeLabels.GetValueOrDefault(_selectedRecipe!.Value.RowId, "it")} x{_searchQuantity} to the list"
             : "Pick a recipe first";
-        var clicked = M3Widgets.Button("##addRecipeBtn", "Add to list", M3ButtonStyle.Filled, FontAwesomeIcon.Plus, enabled: canAdd, tooltip: tooltip);
+        var clicked = M3Widgets.Button("##addRecipeBtn", "添加到清单", M3ButtonStyle.Filled, FontAwesomeIcon.Plus, enabled: canAdd, tooltip: tooltip);
         if (!clicked && canAdd && ImGui.IsItemHovered() && ImGui.IsMouseReleased(ImGuiMouseButton.Left))
         {
             clicked = true;
@@ -1119,12 +1119,12 @@ public class CraftingListEditor
             ImGui.SetKeyboardFocusHere();
         }
 
-        M3Widgets.SearchField("##recipe_search", "Search by name, job or level", ref _lastComboFilter, ImGui.GetContentRegionAvail().X);
+        M3Widgets.SearchField("##recipe_search", "按名称、职业或等级搜索", ref _lastComboFilter, ImGui.GetContentRegionAvail().X);
         UpdateRecipeFilter();
         ImGui.Dummy(new Vector2(0f, M3.Space1));
         if (_keywordFilteredRecipes.Count == 0)
         {
-            M3Text.Draw("No recipes match.", M3TextStyle.Muted);
+            M3Text.Draw("没有符合条件的配方。", M3TextStyle.Muted);
             return;
         }
 
@@ -1301,21 +1301,21 @@ public class CraftingListEditor
         var selectionCount = _selectedRecipeIndices.Count;
         Ui.RowText($"{selectionCount} selected", M3Widgets.ButtonHeight, M3TextStyle.Muted);
         ImGui.SameLine(0, M3.Space2);
-        if (M3Widgets.Button("##skipSelected", "Skip", M3ButtonStyle.Text, FontAwesomeIcon.Ban,
+        if (M3Widgets.Button("##skipSelected", "跳过", M3ButtonStyle.Text, FontAwesomeIcon.Ban,
                 tooltip: $"Mark all {selectionCount} selected recipes as skipped."))
         {
             BulkSetSkipping(true);
         }
 
         ImGui.SameLine(0, M3.Space1);
-        if (M3Widgets.Button("##enableSelected", "Enable", M3ButtonStyle.Text, FontAwesomeIcon.Check,
+        if (M3Widgets.Button("##enableSelected", "启用", M3ButtonStyle.Text, FontAwesomeIcon.Check,
                 tooltip: $"Re-enable all {selectionCount} selected recipes."))
         {
             BulkSetSkipping(false);
         }
 
         ImGui.SameLine(0, M3.Space1);
-        if (M3Widgets.Button("##removeSelected", "Remove", M3ButtonStyle.Text, FontAwesomeIcon.Trash,
+        if (M3Widgets.Button("##removeSelected", "移除", M3ButtonStyle.Text, FontAwesomeIcon.Trash,
                 tooltip: $"Remove the {selectionCount} selected recipes from this list.", accent: M3.Scheme.Error))
         {
             indicesToRemove.AddRange(_selectedRecipeIndices);
@@ -1827,7 +1827,7 @@ public class CraftingListEditor
 
         ImGui.SameLine(0, 0);
         ImGui.SetCursorScreenPos(new Vector2(ImGui.GetCursorScreenPos().X, top.Y + (rowHeight - buttonSize) * 0.5f));
-        if (M3Widgets.IconButton("##remove", FontAwesomeIcon.Trash, "Remove this recipe from the list.", diameter: buttonSize))
+        if (M3Widgets.IconButton("##remove", FontAwesomeIcon.Trash, "从清单中移除此配方。", diameter: buttonSize))
         {
             indicesToRemove.Add(row.ListIndex);
         }

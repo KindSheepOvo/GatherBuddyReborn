@@ -32,7 +32,7 @@ public partial class Interface
         }
 
         var current = _alarmCache.Selector.EnsureCurrent();
-        if (!M3Menu.Item("##addAlarm", "Add to alarm preset", FontAwesomeIcon.Bell,
+        if (!M3Menu.Item("##addAlarm", "添加到闹钟预设", FontAwesomeIcon.Bell,
                 tooltip: $"Add {item.Name[GatherBuddy.Language]} to {(current == null ? "a new alarm preset." : CheckUnnamed(current.Name))}"))
         {
             return;
@@ -57,9 +57,9 @@ public partial class Interface
     private void DrawAddToGatherGroup(IGatherable item)
     {
         var current = _gatherGroupCache.Selector.EnsureCurrent();
-        if (M3Menu.Item("##addGroup", "Add to gather group", FontAwesomeIcon.LayerGroup, current != null,
+        if (M3Menu.Item("##addGroup", "添加到采集分组", FontAwesomeIcon.LayerGroup, current != null,
                 tooltip: current == null
-                    ? "Set up and select a gather group first."
+                    ? "请先设置并选中一个采集分组。"
                     : $"Add {item.Name[GatherBuddy.Language]} to {current.Name}")
          && current != null
          && GatherGroup.GatherGroupManager.ChangeGroupNode(current, current.Nodes.Count, item, null, null, null, false))
@@ -71,7 +71,7 @@ public partial class Interface
     private void DrawAddGatherWindow(IGatherable item)
     {
         var current = _gatherWindowCache.Selector.EnsureCurrent();
-        if (!M3Menu.Item("##addWindow", "Add to gather window preset", FontAwesomeIcon.ListUl,
+        if (!M3Menu.Item("##addWindow", "添加到采集窗口预设", FontAwesomeIcon.ListUl,
                 tooltip: $"Add {item.Name[GatherBuddy.Language]} to {(current == null ? "a new gather window preset." : CheckUnnamed(current.Name))}"))
         {
             return;
@@ -116,7 +116,7 @@ public partial class Interface
 
     private static void DrawCreateLink(uint itemId)
     {
-        if (M3Menu.Item("##link", "Link in chat", FontAwesomeIcon.Link))
+        if (M3Menu.Item("##link", "在聊天栏发送物品链接", FontAwesomeIcon.Link))
         {
             Communicator.Print(SeString.CreateItemLink(itemId));
         }
@@ -124,7 +124,7 @@ public partial class Interface
 
     private static void DrawOpenInGarlandTools(uint itemId)
     {
-        if (itemId == 0 || !M3Menu.Item("##garland", "Open in GarlandTools", FontAwesomeIcon.ExternalLinkAlt))
+        if (itemId == 0 || !M3Menu.Item("##garland", "在 GarlandTools 中打开", FontAwesomeIcon.ExternalLinkAlt))
         {
             return;
         }
@@ -161,12 +161,12 @@ public partial class Interface
 
     private static void DrawOpenInTeamCraft(string addressEnd)
     {
-        if (M3Menu.Item("##tcWeb", "Open in TeamCraft (browser)", FontAwesomeIcon.Globe))
+        if (M3Menu.Item("##tcWeb", "在浏览器中打开 TeamCraft", FontAwesomeIcon.Globe))
         {
             OpenInTeamCraftWeb(addressEnd);
         }
 
-        if (M3Menu.Item("##tcApp", "Open in TeamCraft (app)", FontAwesomeIcon.Desktop))
+        if (M3Menu.Item("##tcApp", "在 TeamCraft 应用中打开", FontAwesomeIcon.Desktop))
         {
             OpenInTeamCraftLocal(addressEnd);
         }
@@ -233,7 +233,7 @@ public partial class Interface
     private void DrawAddToAutoGather(IGatherable item)
     {
         var current = _autoGatherListsCache.Selector.Selected;
-        if (!M3Menu.Item("##addAutoGather", "Add to auto-gather list", FontAwesomeIcon.Robot,
+        if (!M3Menu.Item("##addAutoGather", "添加到自动采集清单", FontAwesomeIcon.Robot,
                 tooltip: $"Add {item.Name[GatherBuddy.Language]} to {(current == null ? "a new auto-gather list." : CheckUnnamed(current.Name))}"))
         {
             return;
@@ -272,7 +272,7 @@ public partial class Interface
             return true;
         }
 
-        M3Menu.Heading("Add to auto-gather list");
+        M3Menu.Heading("添加到自动采集清单");
         for (var index = 0; index < lists.Count; ++index)
         {
             var list = lists[index];

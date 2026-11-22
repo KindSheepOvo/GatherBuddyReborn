@@ -31,7 +31,7 @@ public partial class VulcanWindow
         var svc = GatherBuddy.MarketboardService;
         if (svc == null)
         {
-            M3Widgets.EmptyState("##mbUnavailable", "Marketboard unavailable", "The marketboard service could not start.", FontAwesomeIcon.ChartLine);
+            M3Widgets.EmptyState("##mbUnavailable", "市场板服务不可用", "市场板服务未能启动。", FontAwesomeIcon.ChartLine);
             return;
         }
 
@@ -47,14 +47,14 @@ public partial class VulcanWindow
             RefreshScopeOptions(svc);
         }
 
-        if (M3Widgets.Button("##mbRefreshAll", "Refresh all", M3ButtonStyle.Tonal, FontAwesomeIcon.Sync, enabled: _mbHistorySnapshot.Count > 0,
+        if (M3Widgets.Button("##mbRefreshAll", "全部刷新", M3ButtonStyle.Tonal, FontAwesomeIcon.Sync, enabled: _mbHistorySnapshot.Count > 0,
                 tooltip: "Look up the prices of every item in the history again."))
         {
             svc.RefreshAll();
         }
 
         ImGui.SameLine(0, M3.Space2);
-        if (M3Widgets.Button("##mbClear", "Clear history", M3ButtonStyle.Text, FontAwesomeIcon.Trash, enabled: _mbHistorySnapshot.Count > 0))
+        if (M3Widgets.Button("##mbClear", "清除历史", M3ButtonStyle.Text, FontAwesomeIcon.Trash, enabled: _mbHistorySnapshot.Count > 0))
         {
             svc.Clear();
             _mbSelectedItemId = 0;
@@ -117,7 +117,7 @@ public partial class VulcanWindow
 
     private void DrawMarketboardHistoryList(MarketboardService svc)
     {
-        if (M3Widgets.SearchField("##mbsearch", "Search", ref _mbSearch, ImGui.GetContentRegionAvail().X))
+        if (M3Widgets.SearchField("##mbsearch", "搜索", ref _mbSearch, ImGui.GetContentRegionAvail().X))
         {
             _mbFilterDirty = true;
         }
@@ -125,7 +125,7 @@ public partial class VulcanWindow
         ImGui.Dummy(new Vector2(0, M3.Space1));
         if (_mbHistorySnapshot.Count == 0)
         {
-            M3Widgets.EmptyState("##mbEmpty", "No lookups yet", "Right-click any item in the Materials window to look up its price.",
+            M3Widgets.EmptyState("##mbEmpty", "还没有查询记录", "右键点击材料窗口中的物品即可查询价格。",
                 FontAwesomeIcon.Search);
             return;
         }
@@ -137,7 +137,7 @@ public partial class VulcanWindow
 
         if (_mbFilteredSnapshot.Count == 0)
         {
-            M3Text.Draw("No items match your search.", M3TextStyle.Faint);
+            M3Text.Draw("没有符合搜索条件的物品。", M3TextStyle.Faint);
             return;
         }
 
@@ -165,7 +165,7 @@ public partial class VulcanWindow
             }
 
             using var menu = M3Menu.BeginContext($"##mbctx_{itemId}");
-            if (menu.IsOpen && M3Menu.Item("##remove", "Remove from history", FontAwesomeIcon.Trash))
+            if (menu.IsOpen && M3Menu.Item("##remove", "从历史记录中移除", FontAwesomeIcon.Trash))
             {
                 svc.RemoveFromHistory(itemId);
                 if (_mbSelectedItemId == itemId)
@@ -184,7 +184,7 @@ public partial class VulcanWindow
     {
         if (_mbSelectedItemId == 0)
         {
-            M3Widgets.EmptyState("##mbNoItem", "No item selected", "Pick an item on the left to see its prices.", FontAwesomeIcon.ChartLine);
+            M3Widgets.EmptyState("##mbNoItem", "未选择物品", "在左侧选择物品查看价格。", FontAwesomeIcon.ChartLine);
             return;
         }
 
@@ -231,7 +231,7 @@ public partial class VulcanWindow
         }
 
         row.Next(M3Widgets.IconButtonSize, M3.Space2);
-        if (M3Widgets.IconButton("##mbrefresh", FontAwesomeIcon.Sync, "Look the price up again"))
+        if (M3Widgets.IconButton("##mbrefresh", FontAwesomeIcon.Sync, "重新查询价格"))
         {
             svc.ForceRefresh(itemId, scope);
         }
@@ -253,13 +253,13 @@ public partial class VulcanWindow
         if (svc.IsPending(itemId, scope))
         {
             M3Widgets.LinearProgressIndeterminate(new Vector2(ImGui.GetContentRegionAvail().X, 4f * M3.Scale));
-            M3Text.Draw("Fetching market data...", M3TextStyle.Muted);
+            M3Text.Draw("正在获取市场数据…", M3TextStyle.Muted);
             return;
         }
 
         if (svc.HasError(itemId, scope) || data == null)
         {
-            M3Widgets.Banner("##mbNoData", "No market data. The item may not be tradeable, or the request failed.", M3Severity.Warning,
+            M3Widgets.Banner("##mbNoData", "没有市场数据：物品可能不可交易，或请求未成功。", M3Severity.Warning,
                 FontAwesomeIcon.ExclamationTriangle);
             return;
         }
@@ -294,7 +294,7 @@ public partial class VulcanWindow
         M3Widgets.SectionLabel(label);
         if (items.Count == 0)
         {
-            M3Text.Draw("No listings.", M3TextStyle.Faint);
+            M3Text.Draw("暂无挂单。", M3TextStyle.Faint);
             return;
         }
 

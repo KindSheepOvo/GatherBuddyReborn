@@ -116,21 +116,21 @@ public partial class Interface
             M3Tooltip.Show(OceanRoutesTooltip());
         }
 
-        var nextHour = $"{nextHourM:D2}:{nextHourS:D2} to next hour";
+        var nextHour = $"{nextHourM:D2}:{nextHourS:D2} 后进入下一小时";
         flow.Next(M3Widgets.PillSize(nextHour, FontAwesomeIcon.HourglassHalf).X);
         M3Widgets.Pill("##gbr_next_hour", nextHour, HeaderColor(ColorId.HeaderNextHour, M3.Scheme.Secondary), FontAwesomeIcon.HourglassHalf,
-            "Real time until the next Eorzea hour.");
+            "距离下一个艾欧泽亚小时的现实时间。");
     }
 
     private static string OceanRoutesTooltip()
     {
         var now = TimeStamp.UtcNow;
-        return "If this doesn't match your in-game Eorzea time, check that your Windows clock is accurate.\n \n"
-          + "Next Aldenard ocean routes:\n"
+        return "如果与游戏中的艾欧泽亚时间不符，请检查 Windows 时钟。\n \n"
+          + "接下来的阿尔迪纳德海钓航线：\n"
           + $"• {OceanUptime.NextOceanRoute(OceanArea.Aldenard, now)}\n"
           + $"• {OceanUptime.NextOceanRoute(OceanArea.Aldenard, now.AddHours(2))}\n"
           + $"• {OceanUptime.NextOceanRoute(OceanArea.Aldenard, now.AddHours(4))}\n"
-          + "Next Othard ocean routes:\n"
+          + "接下来的奥萨德海钓航线：\n"
           + $"• {OceanUptime.NextOceanRoute(OceanArea.Othard, now)}\n"
           + $"• {OceanUptime.NextOceanRoute(OceanArea.Othard, now.AddHours(2))}\n"
           + $"• {OceanUptime.NextOceanRoute(OceanArea.Othard, now.AddHours(4))}";
@@ -143,7 +143,7 @@ public partial class Interface
         var nextWeatherM = nextWeatherS / RealTime.SecondsPerMinute;
         nextWeatherS -= nextWeatherM * RealTime.SecondsPerMinute;
 
-        var label = $"{nextWeatherM:D2}:{nextWeatherS:D2} to next weather";
+        var label = $"{nextWeatherM:D2}:{nextWeatherS:D2} 后变换天气";
         var pill = M3Widgets.PillSize(label, FontAwesomeIcon.CloudSun);
         var icon = new Vector2(pill.Y);
         var gap = 2f * M3.Scale;
@@ -154,18 +154,18 @@ public partial class Interface
         using var group = ImRaii.Group();
         if (hasIcons)
         {
-            DrawWeatherIcon(_headerCache.LastWeather, _headerCache.LastWeatherIcon, icon, _headerCache.LastWeatherTint, "Last weather");
+            DrawWeatherIcon(_headerCache.LastWeather, _headerCache.LastWeatherIcon, icon, _headerCache.LastWeatherTint, "上一时段天气");
             ImGui.SameLine(0f, gap);
-            DrawWeatherIcon(_headerCache.CurrentWeather, _headerCache.CurrentWeatherIcon, icon, Vector4.One, "Current weather");
+            DrawWeatherIcon(_headerCache.CurrentWeather, _headerCache.CurrentWeatherIcon, icon, Vector4.One, "当前天气");
             ImGui.SameLine(0f, gap);
         }
 
         M3Widgets.Pill("##gbr_next_weather", label, HeaderColor(ColorId.HeaderWeather, M3.Scheme.Tertiary), FontAwesomeIcon.CloudSun,
-            "Real time until the weather changes.");
+            "距离天气变化的现实时间。");
         if (hasIcons)
         {
             ImGui.SameLine(0f, gap);
-            DrawWeatherIcon(_headerCache.NextWeather, _headerCache.NextWeatherIcon, icon, Vector4.One, "Next weather");
+            DrawWeatherIcon(_headerCache.NextWeather, _headerCache.NextWeatherIcon, icon, Vector4.One, "下一时段天气");
         }
     }
 
@@ -186,11 +186,11 @@ public partial class Interface
     {
         var s = M3.Scheme;
         var enabled = GatherBuddy.Config.AlarmsEnabled;
-        var alarmsLabel = enabled ? "Alarms on" : "Alarms off";
+        var alarmsLabel = enabled ? "提醒已开启" : "提醒已关闭";
         var alarmsIcon = enabled ? FontAwesomeIcon.Bell : FontAwesomeIcon.BellSlash;
         flow.Next(M3Widgets.PillSize(alarmsLabel, alarmsIcon).X);
         if (M3Widgets.Pill("##gbr_alarms_toggle", alarmsLabel, enabled ? s.Primary : s.Outline, alarmsIcon,
-                enabled ? "Alarms are on. Click to turn them all off." : "Alarms are off. Click to turn them all on.", true))
+                enabled ? "提醒已开启，点击关闭全部提醒。" : "提醒已关闭，点击开启全部提醒。", true))
         {
             if (enabled)
             {
@@ -215,11 +215,11 @@ public partial class Interface
 
         if (alarmData == null)
         {
-            var empty = item ? "No item alarm yet" : "No fish alarm yet";
+            var empty = item ? "暂无物品提醒" : "暂无鱼类提醒";
             flow.Next(M3Widgets.PillSize(empty, icon).X);
             M3Widgets.Pill(id, empty, s.Outline, icon,
-                item ? "The last item alarm that went off shows here. Click it to /gather that item."
-                     : "The last fish alarm that went off shows here. Click it to /gather that fish.");
+                item ? "这里显示最近触发的物品提醒，点击可用 /gather 查找该物品。"
+                     : "这里显示最近触发的鱼类提醒，点击可用 /gather 查找该鱼类。");
             return;
         }
 

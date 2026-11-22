@@ -37,8 +37,8 @@ public partial class VulcanWindow : M3ShellWindow, IDisposable
 
     private static readonly M3WindowAction[] VulcanWindowActions =
     [
-        new("##vulcan_open_collectables", FontAwesomeIcon.BoxOpen, "Open the collectables turn-in and purchase window"),
-        new("##vulcan_open_craft_status", FontAwesomeIcon.Tasks, "Reopen the Craft Status window for the active crafting queue"),
+        new("##vulcan_open_collectables", FontAwesomeIcon.BoxOpen, "打开收藏品交付与购买窗口"),
+        new("##vulcan_open_craft_status", FontAwesomeIcon.Tasks, "重新打开当前制作队列的状态窗口"),
     ];
 
     // Shared state
@@ -88,30 +88,30 @@ public partial class VulcanWindow : M3ShellWindow, IDisposable
 
     private void BuildPages()
     {
-        AddPage(new M3Page(CraftingListsPageId, "Crafting Lists", FontAwesomeIcon.ClipboardList, SectionCraft,
-            "Lists of things to craft, with their materials and precrafts", DrawCraftingListsPage, false));
-        AddPage(new M3Page(RecipesPageId, "Recipes", FontAwesomeIcon.BookOpen, SectionCraft,
-            "Browse every recipe, craft it now or add it to a list", Panels(DrawRecipesPage), false));
-        AddPage(new M3Page("workshops", "Workshops", FontAwesomeIcon.Industry, SectionCraft,
-            "Company workshop projects and what they still need", Panels(DrawWorkshopsPage), false));
+        AddPage(new M3Page(CraftingListsPageId, "制作清单", FontAwesomeIcon.ClipboardList, SectionCraft,
+            "查看制作清单、所需材料和半成品", DrawCraftingListsPage, false));
+        AddPage(new M3Page(RecipesPageId, "配方", FontAwesomeIcon.BookOpen, SectionCraft,
+            "浏览所有配方，可立即制作或加入清单", Panels(DrawRecipesPage), false));
+        AddPage(new M3Page("workshops", "部队工房", FontAwesomeIcon.Industry, SectionCraft,
+            "查看部队工房项目和所缺材料", Panels(DrawWorkshopsPage), false));
 
-        AddPage(new M3Page(VendorsPageId, "Vendors", FontAwesomeIcon.Store, SectionBuySell,
-            "Find vendors for items and keep buy lists", Panels(DrawVendorsPage), false));
-        AddPage(new M3Page(MarketboardPageId, "Marketboard", FontAwesomeIcon.ChartLine, SectionBuySell,
-            "Marketboard prices and sale history", Panels(DrawMarketboardPage), false));
+        AddPage(new M3Page(VendorsPageId, "商店", FontAwesomeIcon.Store, SectionBuySell,
+            "查找出售物品的商人并维护购买清单", Panels(DrawVendorsPage), false));
+        AddPage(new M3Page(MarketboardPageId, "市场布告板", FontAwesomeIcon.ChartLine, SectionBuySell,
+            "查看市场布告板价格和成交记录", Panels(DrawMarketboardPage), false));
 
-        AddPage(new M3Page("macros", "Macros", FontAwesomeIcon.Scroll, SectionSolvers,
-            "Your own crafting macros", Panels(DrawMacrosPage), false));
-        AddPage(new M3Page("standard_solver", "Standard Solver", FontAwesomeIcon.Cogs, SectionSolvers,
-            "How the dynamic Standard Solver behaves", DrawStandardSolverPage));
-        AddPage(new M3Page("solutions", "Solutions", FontAwesomeIcon.Lightbulb, SectionSolvers,
-            "Saved Raphael solutions", Panels(DrawSolutionsPage), false));
+        AddPage(new M3Page("macros", "宏", FontAwesomeIcon.Scroll, SectionSolvers,
+            "管理你自己的制作宏", Panels(DrawMacrosPage), false));
+        AddPage(new M3Page("standard_solver", "标准求解器", FontAwesomeIcon.Cogs, SectionSolvers,
+            "配置动态标准求解器的行为", DrawStandardSolverPage));
+        AddPage(new M3Page("solutions", "求解方案", FontAwesomeIcon.Lightbulb, SectionSolvers,
+            "查看已保存的 Raphael 求解方案", Panels(DrawSolutionsPage), false));
 
-        AddPage(new M3Page("settings", "Settings", FontAwesomeIcon.Cog, SectionSettings,
-            "Solver, repair, materia and retainer settings for crafting", DrawSettingsPage));
+        AddPage(new M3Page("settings", "设置", FontAwesomeIcon.Cog, SectionSettings,
+            "制作求解器、修理、魔晶石和雇员设置", DrawSettingsPage));
 
-        AddPage(new M3Page("debug", "Debug", FontAwesomeIcon.Bug, SectionTools,
-            "Internal crafting data, for troubleshooting", Panels(DrawDebugPage), false, tool: true));
+        AddPage(new M3Page("debug", "调试", FontAwesomeIcon.Bug, SectionTools,
+            "查看用于故障排查的制作数据", Panels(DrawDebugPage), false, tool: true));
     }
 
     private static System.Action Panels(System.Action draw)
@@ -275,7 +275,7 @@ public partial class VulcanWindow : M3ShellWindow, IDisposable
                 if (GatherBuddy.CollectablesWindow == null)
                 {
                     GatherBuddy.Log.Debug("[VulcanWindow] Collectables action clicked, but the collectables window was unavailable.");
-                    M3Snackbar.Show("The collectables window isn't available.", severity: M3Severity.Error);
+                    M3Snackbar.Show("收藏品窗口不可用。", severity: M3Severity.Error);
                 }
                 else
                 {
@@ -291,7 +291,7 @@ public partial class VulcanWindow : M3ShellWindow, IDisposable
                 }
                 else
                 {
-                    M3Snackbar.Show("No crafting queue is running.");
+                    M3Snackbar.Show("没有正在运行的制作队列。");
                 }
 
                 break;

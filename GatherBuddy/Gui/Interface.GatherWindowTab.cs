@@ -110,7 +110,7 @@ public partial class Interface
         var current = _gatherWindowCache.Selector.Current;
         var row = new Ui.Row(M3Widgets.ButtonHeight);
         row.Place(M3Widgets.IconButtonSize);
-        if (M3Widgets.IconButton("##copy", FontAwesomeIcon.Copy, "Copy this gather window preset to your clipboard", enabled: current != null))
+        if (M3Widgets.IconButton("##copy", FontAwesomeIcon.Copy, "复制此采集窗口预设到剪贴板", enabled: current != null))
         {
             try
             {
@@ -125,11 +125,11 @@ public partial class Interface
         }
 
         row.Next(M3Widgets.ButtonHeight, M3.Space1);
-        if (M3Widgets.Button("##alarms", "Make alarms", M3ButtonStyle.Text, FontAwesomeIcon.Bell, enabled: current != null,
-                tooltip: "Create a new alarm group from this gather window preset."))
+        if (M3Widgets.Button("##alarms", "创建提醒", M3ButtonStyle.Text, FontAwesomeIcon.Bell, enabled: current != null,
+                tooltip: "从此采集窗口预设创建新的提醒组。"))
         {
             _plugin.AlarmManager.AddGroup(new AlarmGroup(current!));
-            M3Snackbar.Show("Created an alarm group.");
+            M3Snackbar.Show("已创建提醒组。");
         }
 
         row.Next(ImGui.GetFrameHeight(), M3.Space2);
@@ -162,12 +162,12 @@ public partial class Interface
             _plugin.GatherWindowManager.TogglePreset(preset);
         }
 
-        M3Tooltip.Hovered("Show this preset's items in the gather window.");
+        M3Tooltip.Hovered("在采集窗口显示此预设的物品。");
         ImGui.SameLine(0, M3.Space2);
         Ui.RowText(enabled ? "Enabled" : "Disabled", M3TextField.Height, M3TextStyle.Muted);
 
         ImGui.Dummy(new Vector2(0, M3.Space2));
-        M3Widgets.SectionLabel($"Items ({preset.Items.Count})");
+        M3Widgets.SectionLabel($"物品（{preset.Items.Count}）");
         var comboWidth = SetInputWidth * 1.4f;
         for (var i = 0; i < preset.Items.Count; ++i)
         {
@@ -175,7 +175,7 @@ public partial class Interface
             var item = preset.Items[i];
             using (ImRaii.Group())
             {
-                if (M3Widgets.IconButton("##delete", FontAwesomeIcon.Trash, "Remove this item from the preset", diameter: M3Widgets.ComboHeight))
+                if (M3Widgets.IconButton("##delete", FontAwesomeIcon.Trash, "从预设中移除此物品", diameter: M3Widgets.ComboHeight))
                 {
                     _plugin.GatherWindowManager.RemoveItem(preset, i--);
                     continue;
@@ -199,7 +199,7 @@ public partial class Interface
         var newItem = GatherGroupCache.AllGatherables[_gatherWindowCache.NewGatherableIdx];
         var contained = preset.Items.Contains(newItem);
         if (M3Widgets.IconButton("##add", FontAwesomeIcon.Plus,
-                contained ? "This item is already in the preset." : "Add this item at the end of the preset", M3ButtonStyle.Tonal,
+                contained ? "此物品已在预设中。" : "将此物品添加到预设末尾", M3ButtonStyle.Tonal,
                 diameter: M3Widgets.ComboHeight, enabled: !contained))
         {
             _plugin.GatherWindowManager.AddItem(preset, newItem);
@@ -223,7 +223,7 @@ public partial class Interface
             }
             else
             {
-                M3Widgets.EmptyState("##noPreset", "No preset selected", "Add a preset with the plus button below the list.", FontAwesomeIcon.ListUl);
+                M3Widgets.EmptyState("##noPreset", "未选择预设", "点击清单下方的加号添加预设。", FontAwesomeIcon.ListUl);
             }
         });
     }

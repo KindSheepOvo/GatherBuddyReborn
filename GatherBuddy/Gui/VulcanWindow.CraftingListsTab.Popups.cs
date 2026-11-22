@@ -8,10 +8,10 @@ namespace GatherBuddy.Gui;
 
 public partial class VulcanWindow
 {
-    private const string CreateListDialogId = "New crafting list###gbr_create_crafting_list";
-    private const string CreateFolderDialogId = "New crafting list folder###gbr_create_crafting_folder";
-    private const string ImportListDialogId = "Import crafting list###gbr_import_crafting_list";
-    private const string EphemeralSupporting = "Delete this list automatically after crafting completes. You can turn this off later in the list editor.";
+    private const string CreateListDialogId = "新建制作清单###gbr_create_crafting_list";
+    private const string CreateFolderDialogId = "新建制作清单文件夹###gbr_create_crafting_folder";
+    private const string ImportListDialogId = "导入制作清单###gbr_import_crafting_list";
+    private const string EphemeralSupporting = "制作完成后自动删除此清单。稍后可在清单编辑器中关闭此设置。";
 
     private string _newListName = string.Empty;
     private bool _newListEphemeral = false;
@@ -51,7 +51,7 @@ public partial class VulcanWindow
             return;
         }
 
-        using var dialog = M3Dialog.Begin(ImportListDialogId, "Import a list", "Paste a list export string from Vulcan below.", FontAwesomeIcon.None,
+        using var dialog = M3Dialog.Begin(ImportListDialogId, "导入清单", "在下方粘贴 Vulcan 的清单导出字符串。", FontAwesomeIcon.None,
             520f);
         if (!dialog.IsOpen)
         {
@@ -72,12 +72,12 @@ public partial class VulcanWindow
         }
 
         ImGui.Dummy(new Vector2(0f, M3.Space1));
-        M3Widgets.RowSwitch("Ephemeral##importListEphemeral", ref _importListEphemeral, EphemeralSupporting);
+        M3Widgets.RowSwitch("临时清单##importListEphemeral", ref _importListEphemeral, EphemeralSupporting);
 
         var pressed = M3Dialog.Actions(
         [
-            new M3DialogAction("Cancel"),
-            new M3DialogAction("Import", M3ButtonStyle.Filled, FontAwesomeIcon.FileImport, !string.IsNullOrWhiteSpace(_importListText)),
+            new M3DialogAction("取消"),
+            new M3DialogAction("导入", M3ButtonStyle.Filled, FontAwesomeIcon.FileImport, !string.IsNullOrWhiteSpace(_importListText)),
         ], false);
         if (pressed == 0)
         {
@@ -94,7 +94,7 @@ public partial class VulcanWindow
         var (imported, error) = GatherBuddy.CraftingListManager.ImportList(_importListText);
         if (imported == null)
         {
-            _importListError = error ?? "That doesn't look like a list export string.";
+            _importListError = error ?? "输入内容不是有效的清单导出字符串。";
             return;
         }
 
@@ -108,7 +108,7 @@ public partial class VulcanWindow
         _deferEditorDraw = true;
         ClearImportListState();
         ImGui.CloseCurrentPopup();
-        M3Snackbar.Show($"Imported {imported.Name}.", severity: M3Severity.Success);
+        M3Snackbar.Show($"已导入 {imported.Name}。", severity: M3Severity.Success);
     }
 
     private void ClearImportListState()
@@ -125,8 +125,8 @@ public partial class VulcanWindow
             return;
         }
 
-        var supporting = string.IsNullOrEmpty(_newListFolderPath) ? null : $"In {CraftingListManager.FormatFolderPath(_newListFolderPath)}";
-        using var dialog = M3Dialog.Begin(CreateListDialogId, "New crafting list", supporting, FontAwesomeIcon.None, 420f);
+        var supporting = string.IsNullOrEmpty(_newListFolderPath) ? null : $"位于 {CraftingListManager.FormatFolderPath(_newListFolderPath)}";
+        using var dialog = M3Dialog.Begin(CreateListDialogId, "新建制作清单", supporting, FontAwesomeIcon.None, 420f);
         if (!dialog.IsOpen)
         {
             return;
@@ -134,7 +134,7 @@ public partial class VulcanWindow
 
         if (_newListRecipeId.HasValue)
         {
-            M3Widgets.Pill("##new_list_recipe", $"Starts with {_newListRecipeName}", M3.Scheme.Primary, FontAwesomeIcon.Hammer);
+            M3Widgets.Pill("##new_list_recipe", $"初始配方：{_newListRecipeName}", M3.Scheme.Primary, FontAwesomeIcon.Hammer);
             ImGui.Dummy(new Vector2(0f, M3.Space1));
         }
 
@@ -143,21 +143,21 @@ public partial class VulcanWindow
             ImGui.SetKeyboardFocusHere();
         }
 
-        M3TextField.Draw("##newListName", "List name", ref _newListName, ImGui.GetContentRegionAvail().X, 256);
+        M3TextField.Draw("##newListName", "清单名称", ref _newListName, ImGui.GetContentRegionAvail().X, 256);
         var submitted = SubmittedWithEnter();
         if (!string.IsNullOrWhiteSpace(_newListName) && !GatherBuddy.CraftingListManager.IsNameUnique(_newListName))
         {
-            M3Text.Draw("A list with this name already exists. It will be renamed automatically.", M3TextStyle.Warning, true);
+            M3Text.Draw("同名清单已存在，将自动重命名。", M3TextStyle.Warning, true);
         }
 
         ImGui.Dummy(new Vector2(0f, M3.Space1));
-        M3Widgets.RowSwitch("Ephemeral##newListEphemeral", ref _newListEphemeral, EphemeralSupporting);
+        M3Widgets.RowSwitch("临时清单##newListEphemeral", ref _newListEphemeral, EphemeralSupporting);
 
         var canCreate = !string.IsNullOrWhiteSpace(_newListName);
         var pressed = M3Dialog.Actions(
         [
-            new M3DialogAction("Cancel"),
-            new M3DialogAction("Create", M3ButtonStyle.Filled, FontAwesomeIcon.Check, canCreate),
+            new M3DialogAction("取消"),
+            new M3DialogAction("创建", M3ButtonStyle.Filled, FontAwesomeIcon.Check, canCreate),
         ], false);
         if (pressed == 0)
         {
@@ -198,8 +198,8 @@ public partial class VulcanWindow
             return;
         }
 
-        var supporting = string.IsNullOrEmpty(_newFolderParentPath) ? null : $"Inside {CraftingListManager.FormatFolderPath(_newFolderParentPath)}";
-        using var dialog = M3Dialog.Begin(CreateFolderDialogId, "New folder", supporting, FontAwesomeIcon.None, 400f);
+        var supporting = string.IsNullOrEmpty(_newFolderParentPath) ? null : $"位于 {CraftingListManager.FormatFolderPath(_newFolderParentPath)}";
+        using var dialog = M3Dialog.Begin(CreateFolderDialogId, "新建文件夹", supporting, FontAwesomeIcon.None, 400f);
         if (!dialog.IsOpen)
         {
             return;
@@ -210,18 +210,18 @@ public partial class VulcanWindow
             ImGui.SetKeyboardFocusHere();
         }
 
-        M3TextField.Draw("##newFolderName", "Folder name", ref _newFolderName, ImGui.GetContentRegionAvail().X, 256);
+        M3TextField.Draw("##newFolderName", "文件夹名称", ref _newFolderName, ImGui.GetContentRegionAvail().X, 256);
         var submitted = SubmittedWithEnter();
         var isAvailable = GatherBuddy.CraftingListManager.IsFolderNameAvailable(_newFolderName, _newFolderParentPath);
         if (!string.IsNullOrWhiteSpace(_newFolderName) && !isAvailable)
         {
-            M3Text.Draw("Folder names must be unique within the current location and cannot contain / or \\.", M3TextStyle.Error, true);
+            M3Text.Draw("同一位置的文件夹名称不能重复，也不能包含 / 或 \\。", M3TextStyle.Error, true);
         }
 
         var pressed = M3Dialog.Actions(
         [
-            new M3DialogAction("Cancel"),
-            new M3DialogAction("Create", M3ButtonStyle.Filled, FontAwesomeIcon.Check, isAvailable),
+            new M3DialogAction("取消"),
+            new M3DialogAction("创建", M3ButtonStyle.Filled, FontAwesomeIcon.Check, isAvailable),
         ], false);
         if (pressed == 0)
         {

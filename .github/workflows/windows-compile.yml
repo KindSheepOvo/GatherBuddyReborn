@@ -1,0 +1,72 @@
+name: Windows Compile
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compile:
+    runs-on: windows-2025
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          submodules: recursive
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Set up Dalamud API 15 references
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'dalamud-api15.zip'
+          $referencePath = Join-Path $env:APPDATA 'XIVLauncher\addon\Hooks\dev'
+          Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/goatcorp/dalamud-distrib/74c1ebada2e4b2036d39c2f1ff52f1d4b95180fa/latest.zip' -OutFile $archive
+          $sha256 = (Get-FileHash -Algorithm SHA256 -Path $archive).Hash
+          if ($sha256 -ne '3f0d8b64d2ed7c868b57541c81f5308692eb69bb856517fa3d14955fd056e815') {
+            throw 'Dalamud archive SHA-256 mismatch.'
+          }
+          Expand-Archive -Path $archive -DestinationPath $referencePath -Force
+          if (-not (Test-Path (Join-Path $referencePath 'Dalamud.dll'))) {
+            throw 'Dalamud.dll was not found in the reference directory.'
+          }
+
+      - name: Set up Dalamud CN API 15 references
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:RUNNER_TEMP 'dalamud-cn-api15.7z'
+          $referencePath = Join-Path $env:APPDATA 'XIVLauncherCN\addon\Hooks\dev'
+          Invoke-WebRequest -Uri 'https://raw.githubusercontent.com/ottercorp/dalamud-distrib/5f709b7ebc53e00dcbf4d201180c6b9faec6abf4/latest.7z' -OutFile $archive
+          $sha256 = (Get-FileHash -Algorithm SHA256 -Path $archive).Hash
+          if ($sha256 -ne 'e67cee8916d21d2fca5766ceb47311d385bd6c35484f02b00ed8c8ff740f2926') {
+            throw 'Dalamud CN archive SHA-256 mismatch.'
+          }
+          $sevenZip = Join-Path $env:ProgramFiles '7-Zip\7z.exe'
+          & $sevenZip x $archive "-o$referencePath" -y
+          if ($LASTEXITCODE -ne 0 -or -not (Test-Path (Join-Path $referencePath 'Dalamud.dll'))) {
+            throw 'Dalamud CN references failed to extract.'
+          }
+
+      - name: Restore plugin
+        run: dotnet restore GatherBuddy/GatherBuddy.csproj
+
+      - name: Compile plugin
+        run: dotnet build GatherBuddy/GatherBuddy.csproj --no-restore --configuration Release --output build
+
+      - name: Verify compiled plugin DLL
+        shell: pwsh
+        run: |
+          $dll = Get-Item -LiteralPath 'build/GatherBuddyReborn.dll' -ErrorAction Stop
+          if ($dll.Length -eq 0) { throw 'Compiled plugin DLL is empty.' }
+          Get-FileHash -Algorithm SHA256 -Path $dll.FullName
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: GatherBuddyReborn-windows-compile
+          path: build/
+          if-no-files-found: error
+          retention-days: 7

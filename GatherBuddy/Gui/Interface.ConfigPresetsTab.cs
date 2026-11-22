@@ -296,29 +296,29 @@ namespace GatherBuddy.Gui
 
         private void DrawPresetOverview(ConfigPreset preset, bool isDefault)
         {
-            using var card = M3Card.Begin("preset_overview", isDefault ? "Default preset" : CheckUnnamed(preset.Name), FontAwesomeIcon.SlidersH,
+            using var card = M3Card.Begin("preset_overview", isDefault ? "默认预设" : CheckUnnamed(preset.Name), FontAwesomeIcon.SlidersH,
                 M3.AccentFor(0), M3CardStyle.Filled,
-                "Presets are checked against the item being gathered from top to bottom, and only the first match is used. "
-              + "The Default preset always comes last and covers every item no other preset matches.");
+                "按顺序检查预设，只使用第一个匹配当前采集物品的预设。"
+              + "默认预设始终排在最后，适用于未匹配其他预设的物品。");
 
             if (!isDefault)
             {
                 var name = preset.Name;
-                if (M3Widgets.RowText("Name", ref name, "Preset name", null, 64))
+                if (M3Widgets.RowText("名称###Name", ref name, "预设名称", null, 64))
                 {
                     preset.Name = name;
                     MarkPresetsDirty();
                 }
 
                 var enabled = preset.Enabled;
-                if (M3Widgets.RowSwitch("Enabled", ref enabled, "Disabled presets are skipped. Double-click a preset in the list to toggle it too."))
+                if (M3Widgets.RowSwitch("启用###Enabled", ref enabled, "跳过已禁用的预设。也可以双击列表中的预设切换启用状态。"))
                 {
                     preset.Enabled = enabled;
                     MarkPresetsDirty();
                 }
             }
 
-            if (M3Widgets.RowButton("Share this preset", "Copy", "Copies the preset to your clipboard, ready to import with the list's import button.",
+            if (M3Widgets.RowButton("分享此预设###Share this preset", "复制", "将预设复制到剪贴板，可通过列表的导入按钮导入。",
                     M3ButtonStyle.Tonal, FontAwesomeIcon.Copy))
             {
                 ImGui.SetClipboardText(preset.ToBase64String());
@@ -326,8 +326,8 @@ namespace GatherBuddy.Gui
                 M3Snackbar.Show($"Copied {CheckUnnamed(preset.Name)} to the clipboard.", severity: M3Severity.Success);
             }
 
-            if (M3Widgets.RowButton("Check which preset each item uses", "Check",
-                    "Lists every item in your enabled auto-gather lists, and crystals, with the preset it will use.", M3ButtonStyle.Tonal,
+            if (M3Widgets.RowButton("检查物品使用的预设###Check which preset each item uses", "检查",
+                    "显示已启用的自动采集清单中的所有物品及水晶，并列出各自匹配的预设。", M3ButtonStyle.Tonal,
                     FontAwesomeIcon.Tasks))
             {
                 M3Dialog.Open(PresetCheckerDialogId);
@@ -336,8 +336,8 @@ namespace GatherBuddy.Gui
 
         private void DrawPresetFilters(ConfigPreset preset)
         {
-            using var card = M3Card.Begin("preset_filters", "Applies to", FontAwesomeIcon.Filter, M3.AccentFor(1), M3CardStyle.Filled,
-                "The items this preset is used for.");
+            using var card = M3Card.Begin("preset_filters", "适用范围", FontAwesomeIcon.Filter, M3.AccentFor(1), M3CardStyle.Filled,
+                "此预设适用的物品。");
 
             var kind = preset.ItemLevel.UseGlv ? 1 : 0;
             if (M3Widgets.RowSegmented("Level type", ref kind, LevelKindSegments))
@@ -452,7 +452,7 @@ namespace GatherBuddy.Gui
                 return;
             }
 
-            using var card = M3Card.Begin("preset_general", "General", FontAwesomeIcon.Cog, M3.AccentFor(2));
+            using var card = M3Card.Begin("preset_general", "常规", FontAwesomeIcon.Cog, M3.AccentFor(2));
             if (types.Crystals || types.Other)
             {
                 var gp = preset.GatherableMinGP;
@@ -489,8 +489,8 @@ namespace GatherBuddy.Gui
                 }
 
                 var manual = preset.CollectableManualScores;
-                if (M3Widgets.RowSwitch("Set collectability scores manually", ref manual,
-                        "When off, the scores are read from the game. When on, enter the target and minimum scores yourself."))
+                if (M3Widgets.RowSwitch("手动设置收藏价值###Set collectability scores manually", ref manual,
+                        "关闭后从游戏读取收藏价值；开启后可手动填写目标值和最低值。"))
                 {
                     preset.CollectableManualScores = manual;
                     MarkPresetsDirty();
@@ -549,8 +549,8 @@ namespace GatherBuddy.Gui
             var types = preset.ItemType;
             if ((types.Crystals || types.Other) && !preset.ChooseBestActionsAutomatically)
             {
-                using var card = M3Card.Begin("preset_gathering_actions", "Gathering actions", FontAwesomeIcon.Leaf, M3.AccentFor(0),
-                    M3CardStyle.Filled, "Turn on an action to set when it is used.");
+                using var card = M3Card.Begin("preset_gathering_actions", "采集技能", FontAwesomeIcon.Leaf, M3.AccentFor(0),
+                    M3CardStyle.Filled, "启用技能后可设置其使用时机。");
                 var actions = preset.GatherableActions;
                 DrawActionRow(ConcatNames(Actions.Luck), actions.Luck);
                 DrawActionRow(ConcatNames(Actions.Bountiful), actions.Bountiful);
@@ -569,8 +569,8 @@ namespace GatherBuddy.Gui
 
             if (types.Collectables && !preset.ChooseBestActionsAutomatically)
             {
-                using var card = M3Card.Begin("preset_collectable_actions", "Collectable actions", FontAwesomeIcon.Gem, M3.AccentFor(1),
-                    M3CardStyle.Filled, "Turn on an action to set when it is used.");
+                using var card = M3Card.Begin("preset_collectable_actions", "收藏品采集技能", FontAwesomeIcon.Gem, M3.AccentFor(1),
+                    M3CardStyle.Filled, "启用技能后可设置其使用时机。");
                 var actions = preset.CollectableActions;
                 DrawActionRow(Actions.Scour.Names.Botanist, actions.Scour);
                 DrawActionRow(Actions.Brazen.Names.Botanist, actions.Brazen);
@@ -581,8 +581,8 @@ namespace GatherBuddy.Gui
 
             if (types.Fish)
             {
-                using var card = M3Card.Begin("preset_fishing_actions", "Fishing actions", FontAwesomeIcon.Fish, M3.AccentFor(2),
-                    M3CardStyle.Filled, "Turn on an action to set when it is used.");
+                using var card = M3Card.Begin("preset_fishing_actions", "钓鱼技能", FontAwesomeIcon.Fish, M3.AccentFor(2),
+                    M3CardStyle.Filled, "启用技能后可设置其使用时机。");
                 var actions = preset.FishingActions;
                 DrawToggleRow("Patience / Patience II", actions.Patience);
                 DrawFishingActionRow(Actions.DoubleHook.Name, actions.DoubleHook, actions.TripleHook);
@@ -598,8 +598,8 @@ namespace GatherBuddy.Gui
 
         private void DrawPresetConsumables(ConfigPreset preset)
         {
-            using var card = M3Card.Begin("preset_consumables", "Consumables", FontAwesomeIcon.Flask, M3.AccentFor(0), M3CardStyle.Filled,
-                "Items in your inventory are listed first, with how many you have.");
+            using var card = M3Card.Begin("preset_consumables", "消耗品", FontAwesomeIcon.Flask, M3.AccentFor(0), M3CardStyle.Filled,
+                "优先列出背包中的物品，并显示持有数量。");
             var consumables = preset.Consumables;
             DrawActionRow("Cordial", consumables.Cordial, PossibleCordials);
             DrawActionRow("Food", consumables.Food, PossibleFoods, true);
@@ -800,8 +800,8 @@ namespace GatherBuddy.Gui
 
         private void DrawPresetChecker()
         {
-            using var dialog = M3Dialog.Begin(PresetCheckerDialogId, "Which preset each item uses",
-                "Items from your enabled auto-gather lists, and crystals, with the preset that matches each of them.", FontAwesomeIcon.Tasks, 640f);
+            using var dialog = M3Dialog.Begin(PresetCheckerDialogId, "物品匹配的预设",
+                "显示已启用的自动采集清单中的物品及水晶，并列出各自匹配的预设。", FontAwesomeIcon.Tasks, 640f);
             if (!dialog.IsOpen)
             {
                 return;

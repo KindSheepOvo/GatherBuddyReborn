@@ -1,5 +1,6 @@
 ﻿using Dalamud.Game;
 using GatherBuddy.Classes;
+using GatherBuddy.Utility;
 using System.Collections.Frozen;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,13 +18,19 @@ public class Identificator
     public Identificator()
     {
         _data = GatherBuddy.GameData;
-        var languages = new[]
+        var language = GatherBuddy.Language;
+        var primary = (int)language is >= 0 and < 4 ? (int)language : 0;
+        ClientLanguage[] languages =
+        [
+            (ClientLanguage)primary,
+            (ClientLanguage)((primary + 1) % 4),
+            (ClientLanguage)((primary + 2) % 4),
+            (ClientLanguage)((primary + 3) % 4),
+        ];
+        if (language == MultiString.SimplifiedChinese)
         {
-            GatherBuddy.Language,
-            (ClientLanguage)(((int)GatherBuddy.Language + 1) % 4),
-            (ClientLanguage)(((int)GatherBuddy.Language + 2) % 4),
-            (ClientLanguage)(((int)GatherBuddy.Language + 3) % 4),
-        };
+            languages = [MultiString.SimplifiedChinese, .. languages];
+        }
 
         _gatherableFromLanguage = [.. languages.Select(CreateGatherableDictionary)];
         _fishFromLanguage = [.. languages.Select(CreateFishDictionary)];

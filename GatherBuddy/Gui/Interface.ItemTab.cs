@@ -44,13 +44,13 @@ public partial class Interface
             {
                 _globalScale = ImGuiHelpers.GlobalScale;
                 _nameColumnWidth = (MaxTextWidth(Items, static i => i.Data.Name[GatherBuddy.Language]) + ItemSpacing.X + LineIconSize.X) / Scale;
-                _gatheredColumnWidth = TextWidth(_gatheredColumn.Label) / Scale + Table.ArrowWidth;
-                _levelingColumnWidth = TextWidth(_levelingColumn.Label) / Scale + Table.ArrowWidth;
+                _gatheredColumnWidth = TextWidth(_gatheredColumn.DisplayLabel) / Scale + Table.ArrowWidth;
+                _levelingColumnWidth = TextWidth(_levelingColumn.DisplayLabel) / Scale + Table.ArrowWidth;
                 _nextUptimeColumnWidth = Math.Max(TextWidth("99:99 Minutes") / Scale,
-                    TextWidth(_nextUptimeColumn.Label) / Scale + Table.ArrowWidth);
+                    TextWidth(_nextUptimeColumn.DisplayLabel) / Scale + Table.ArrowWidth);
                 _closestAetheryteColumnWidth = MaxTextWidth(GatherBuddy.GameData.Aetherytes.Values, static a => a.Name) / Scale;
                 _levelColumnWidth = Math.Max(TextWidth("99*****") / Scale,
-                    TextWidth(_levelColumn.Label) / Scale + Table.ArrowWidth);
+                    TextWidth(_levelColumn.DisplayLabel) / Scale + Table.ArrowWidth);
                 var jobNameWidth = 0f;
                 foreach (var jobName in Enum.GetNames<GatheringType>())
                 {
@@ -60,16 +60,16 @@ public partial class Interface
                     }
                 }
 
-                _jobColumnWidth = Math.Max(TextWidth(_jobColumn.Label) / Scale + Table.ArrowWidth, jobNameWidth / Scale);
-                _typeColumnWidth = Math.Max(TextWidth(_typeColumn.Label) / Scale + Table.ArrowWidth,
+                _jobColumnWidth = Math.Max(TextWidth(_jobColumn.DisplayLabel) / Scale + Table.ArrowWidth, jobNameWidth / Scale);
+                _typeColumnWidth = Math.Max(TextWidth(_typeColumn.DisplayLabel) / Scale + Table.ArrowWidth,
                     MaxTextWidth(Enum.GetNames<NodeType>(), static name => name) / Scale);
-                _expansionColumnWidth = TextWidth(_expansionColumn.Label) / Scale + Table.ArrowWidth;
+                _expansionColumnWidth = TextWidth(_expansionColumn.DisplayLabel) / Scale + Table.ArrowWidth;
                 _folkloreColumnWidth = MaxTextWidth(Items, static i => i.Folklore) / Scale;
                 _uptimeColumnWidth = MaxTextWidth(Items, static i => i.Uptimes) / Scale;
                 _bestNodeColumnWidth = MaxTextWidth(GatherBuddy.GameData.GatheringNodes.Values, static a => a.Name) / Scale;
                 _bestZoneColumnWidth = MaxTextWidth(GatherBuddy.GameData.Territories.Values, static a => a.Name) / Scale;
-                _itemIdColumnWidth = Math.Max(TextWidth("999999") / Scale, TextWidth(_itemIdColumn.Label) / Scale + Table.ArrowWidth);
-                _gatheringIdColumnWidth = Math.Max(TextWidth("99999") / Scale, TextWidth(_gatheringIdColumn.Label) / Scale + Table.ArrowWidth);
+                _itemIdColumnWidth = Math.Max(TextWidth("999999") / Scale, TextWidth(_itemIdColumn.DisplayLabel) / Scale + Table.ArrowWidth);
+                _gatheringIdColumnWidth = Math.Max(TextWidth("99999") / Scale, TextWidth(_gatheringIdColumn.DisplayLabel) / Scale + Table.ArrowWidth);
             }
         }
 
@@ -135,21 +135,21 @@ public partial class Interface
             }
         }
 
-        private static readonly NameColumn _nameColumn = new() { Label = "Filter items" };
-        private static readonly GatheredColumn _gatheredColumn = new() { Label = "Log" };
-        private static readonly LevelingColumn _levelingColumn = new() { Label = "Leveling" };
-        private static readonly NextUptimeColumn _nextUptimeColumn = new() { Label = "Next Uptime" };
-        private static readonly AetheryteColumn _aetheryteColumn = new() { Label = "Aetheryte" };
-        private static readonly LevelColumn _levelColumn = new() { Label = "Lvl" };
-        private static readonly JobColumn _jobColumn = new() { Label = "Gathering" };
-        private static readonly TypeColumn _typeColumn = new() { Label = "Node Type" };
-        private static readonly ExpansionColumn _expansionColumn = new() { Label = "Exp." };
-        private static readonly FolkloreColumn _folkloreColumn = new() { Label = "Folklore" };
-        private static readonly UptimesColumn _uptimesColumn = new() { Label = "Uptimes" };
-        private static readonly BestNodeColumn _bestNodeColumn = new() { Label = "Best Node" };
-        private static readonly BestZoneColumn _bestZoneColumn = new() { Label = "Best Zone" };
-        private static readonly ItemIdColumn _itemIdColumn = new() { Label = "Item Id" };
-        private static readonly GatheringIdColumn _gatheringIdColumn = new() { Label = "G. Id" };
+        private static readonly NameColumn _nameColumn = new() { Label = "Filter items", LocalizedLabel = "物品名称..." };
+        private static readonly GatheredColumn _gatheredColumn = new() { Label = "Log", LocalizedLabel = "采集记录" };
+        private static readonly LevelingColumn _levelingColumn = new() { Label = "Leveling", LocalizedLabel = "练级" };
+        private static readonly NextUptimeColumn _nextUptimeColumn = new() { Label = "Next Uptime", LocalizedLabel = "下次时间" };
+        private static readonly AetheryteColumn _aetheryteColumn = new() { Label = "Aetheryte", LocalizedLabel = "以太之光" };
+        private static readonly LevelColumn _levelColumn = new() { Label = "Lvl", LocalizedLabel = "等级..." };
+        private static readonly JobColumn _jobColumn = new() { Label = "Gathering", LocalizedLabel = "采集类型" };
+        private static readonly TypeColumn _typeColumn = new() { Label = "Node Type", LocalizedLabel = "采集点类型" };
+        private static readonly ExpansionColumn _expansionColumn = new() { Label = "Exp.", LocalizedLabel = "版本" };
+        private static readonly FolkloreColumn _folkloreColumn = new() { Label = "Folklore", LocalizedLabel = "传承录" };
+        private static readonly UptimesColumn _uptimesColumn = new() { Label = "Uptimes", LocalizedLabel = "出现时段" };
+        private static readonly BestNodeColumn _bestNodeColumn = new() { Label = "Best Node", LocalizedLabel = "最佳采集点" };
+        private static readonly BestZoneColumn _bestZoneColumn = new() { Label = "Best Zone", LocalizedLabel = "最佳区域" };
+        private static readonly ItemIdColumn _itemIdColumn = new() { Label = "Item Id", LocalizedLabel = "物品 ID" };
+        private static readonly GatheringIdColumn _gatheringIdColumn = new() { Label = "G. Id", LocalizedLabel = "采集品 ID" };
 
         private class ItemFilterColumn : ColumnFlags<ItemFilter, ExtendedGatherable>
         {
@@ -211,7 +211,7 @@ public partial class Interface
 
                 using var id = ImRaii.PushId(FilterLabel);
                 var all = DisabledValues.Count == 0;
-                if (TableFilter.Button("##filter", Label, !all, TableFilter.CellWidth, out var cleared))
+                if (TableFilter.Button("##filter", DisplayLabel, !all, TableFilter.CellWidth, out var cleared))
                 {
                     ImGui.OpenPopup("##menu");
                 }
@@ -228,7 +228,7 @@ public partial class Interface
                 }
 
                 var enableAll = all;
-                if (TableFilter.MenuCheckbox("Show all", ref enableAll))
+                if (TableFilter.MenuCheckbox("全部启用###Show all", ref enableAll))
                 {
                     changed = SetAllOptions(enableAll) || changed;
                 }

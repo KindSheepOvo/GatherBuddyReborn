@@ -13,11 +13,11 @@ internal static class SettingRows
 {
     internal static readonly M3Segment[] AboveBelowSegments =
     [
-        new("Above", FontAwesomeIcon.ArrowUp),
-        new("Below", FontAwesomeIcon.ArrowDown),
+        new("高于", FontAwesomeIcon.ArrowUp),
+        new("低于", FontAwesomeIcon.ArrowDown),
     ];
 
-    private static readonly string[] ModifierLabels = Array.ConvertAll(ModifierHotkey.ValidModifiers, m => m.Modifier == VirtualKey.NO_KEY ? "None" : m.ToString());
+    private static readonly string[] ModifierLabels = Array.ConvertAll(ModifierHotkey.ValidModifiers, m => m.Modifier == VirtualKey.NO_KEY ? "无" : m.ToString());
 
     private static void Save()
         => GatherBuddy.Config.Save();
@@ -196,10 +196,10 @@ internal static class SettingRows
         var width = MathF.Max(64f * M3.Scale, ImGui.GetContentRegionAvail().X - M3Card.RightInset - resetSize - M3.Space1);
         var start = ImGui.GetCursorScreenPos();
         var value = current;
-        var changed = M3TextField.Draw($"##{id}_format", "Leave empty for no chat message", ref value, width);
+        var changed = M3TextField.Draw($"##{id}_format", "留空则不发送聊天消息", ref value, width);
         var fieldHeight = M3TextField.Height;
         ImGui.SetCursorScreenPos(new Vector2(start.X + width + M3.Space1, start.Y + (fieldHeight - resetSize) * 0.5f));
-        if (M3Widgets.IconButton($"##{id}_reset", FontAwesomeIcon.Undo, $"Reset to the default:\n{defaultValue}", enabled: current != defaultValue))
+        if (M3Widgets.IconButton($"##{id}_reset", FontAwesomeIcon.Undo, $"恢复默认值：\n{defaultValue}", enabled: current != defaultValue))
         {
             value = defaultValue;
             changed = true;

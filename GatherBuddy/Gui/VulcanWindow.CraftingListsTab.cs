@@ -14,8 +14,8 @@ namespace GatherBuddy.Gui;
 public partial class VulcanWindow
 {
     private const string CraftingListDragDropPayload = "GatherBuddyCraftingListDragDrop";
-    private const string DeleteListDialogId = "Delete crafting list###gbr_delete_crafting_list";
-    private const string ArtisanLoadedTooltip = "Artisan plugin is loaded. Please unload Artisan to use Vulcan's crafting system.";
+    private const string DeleteListDialogId = "删除制作清单###gbr_delete_crafting_list";
+    private const string ArtisanLoadedTooltip = "Artisan 已加载。请卸载 Artisan 后使用 Vulcan 的制作功能。";
     private const float CraftingListHoldSeconds = 0.6f;
     private int? _draggedCraftingListId = null;
     private int? _pendingDeleteListId;
@@ -64,7 +64,7 @@ public partial class VulcanWindow
         if (_deferEditorDraw)
         {
             _deferEditorDraw = false;
-            M3Text.Draw("Loading...", M3TextStyle.Muted);
+            M3Text.Draw("加载中…", M3TextStyle.Muted);
             return;
         }
 
@@ -109,7 +109,7 @@ public partial class VulcanWindow
 
         var row = new Ui.Row(MathF.Max(buttonSize, blockHeight));
         row.Place(buttonSize);
-        var back = M3Widgets.IconButton("##crafting_list_back", FontAwesomeIcon.ArrowLeft, "Back to your lists");
+        var back = M3Widgets.IconButton("##crafting_list_back", FontAwesomeIcon.ArrowLeft, "返回制作清单");
 
         row.Next(blockHeight, M3.Space2);
         ImGui.BeginGroup();
@@ -124,12 +124,12 @@ public partial class VulcanWindow
         if (list.Ephemeral)
         {
             row.Next(M3Widgets.ChipHeight, M3.Space3);
-            if (M3Widgets.Chip("##crafting_list_ephemeral", "Ephemeral", true, FontAwesomeIcon.HourglassHalf,
-                    "Automatically deleted after crafting completes. Has no effect if stopped manually.\nClick to keep this list."))
+            if (M3Widgets.Chip("##crafting_list_ephemeral", "临时清单", true, FontAwesomeIcon.HourglassHalf,
+                    "制作完成后自动删除；手动停止不受影响。\n点击保留清单。"))
             {
                 list.Ephemeral = false;
                 GatherBuddy.CraftingListManager.SaveList(list);
-                M3Snackbar.Show($"{list.Name} will be kept after crafting.");
+                M3Snackbar.Show($"制作完成后将保留 {list.Name}。");
             }
         }
 
@@ -163,10 +163,10 @@ public partial class VulcanWindow
 
     private void DrawListManagerToolbar()
     {
-        const string newListLabel = "New list";
-        const string newFolderLabel = "New folder";
-        const string importLabel = "Import";
-        const string teamCraftLabel = "TeamCraft import";
+        const string newListLabel = "新建清单";
+        const string newFolderLabel = "新建文件夹";
+        const string importLabel = "导入";
+        const string teamCraftLabel = "从 TeamCraft 导入";
 
         var flow = new M3Flow();
         flow.Next(M3Widgets.ButtonWidth(FontAwesomeIcon.Plus, newListLabel));
@@ -184,7 +184,7 @@ public partial class VulcanWindow
 
         flow.Next(M3Widgets.ButtonWidth(FontAwesomeIcon.FileImport, importLabel));
         if (M3Widgets.Button("##crafting_import", importLabel, M3ButtonStyle.Text, FontAwesomeIcon.FileImport,
-                tooltip: "Import a list someone exported from Vulcan"))
+                tooltip: "导入从 Vulcan 导出的清单"))
         {
             _importListText = string.Empty;
             _importListError = null;
@@ -193,7 +193,7 @@ public partial class VulcanWindow
 
         flow.Next(M3Widgets.ButtonWidth(FontAwesomeIcon.FileDownload, teamCraftLabel));
         if (M3Widgets.Button("##crafting_teamcraft_import", teamCraftLabel, M3ButtonStyle.Text, FontAwesomeIcon.FileDownload,
-                tooltip: "Make a list from the 'Final Items' of a TeamCraft list"))
+                tooltip: "根据 TeamCraft 清单中的「最终物品」创建清单"))
         {
             OpenTeamCraftImport();
         }
@@ -206,10 +206,10 @@ public partial class VulcanWindow
         var manager = GatherBuddy.CraftingListManager;
         var rootFolders = manager.GetDirectSubfolderPaths();
         var rootLists = manager.GetListsInFolder();
-        M3Widgets.SectionLabel($"Lists · {manager.Lists.Count}");
+        M3Widgets.SectionLabel($"清单 · {manager.Lists.Count}");
         if (rootFolders.Count == 0 && rootLists.Count == 0)
         {
-            M3Widgets.EmptyState("##crafting_lists_none", "No lists yet", "Use New list to make one, or import one.", FontAwesomeIcon.ClipboardList);
+            M3Widgets.EmptyState("##crafting_lists_none", "尚无清单", "可新建或导入清单。", FontAwesomeIcon.ClipboardList);
             return;
         }
 
@@ -273,22 +273,22 @@ public partial class VulcanWindow
             return;
         }
 
-        if (M3Menu.Item("##folder_new_list", "New list here", FontAwesomeIcon.Plus))
+        if (M3Menu.Item("##folder_new_list", "在此新建清单", FontAwesomeIcon.Plus))
         {
             PrepareCreateListPopup(folderPath);
             _openCreateListPopup = true;
             GatherBuddy.Log.Debug($"[VulcanWindow] Queued Create List popup for folder '{folderPath}'");
         }
 
-        if (M3Menu.Item("##folder_new_subfolder", "New subfolder", FontAwesomeIcon.FolderPlus))
+        if (M3Menu.Item("##folder_new_subfolder", "新建子文件夹", FontAwesomeIcon.FolderPlus))
         {
             QueueCreateFolderPopup(folderPath);
         }
 
         M3Menu.Divider();
         var canDelete = GatherBuddy.CraftingListManager.CanDeleteFolder(folderPath);
-        if (M3Menu.Item("##folder_delete", "Delete folder", FontAwesomeIcon.Trash, canDelete,
-                tooltip: canDelete ? null : "Move or delete the lists in this folder before removing it."))
+        if (M3Menu.Item("##folder_delete", "删除文件夹", FontAwesomeIcon.Trash, canDelete,
+                tooltip: canDelete ? null : "请先移动或删除此文件夹内的清单。"))
         {
             GatherBuddy.CraftingListManager.DeleteFolder(folderPath);
         }
@@ -299,7 +299,7 @@ public partial class VulcanWindow
         var isHighlighted = _previewList?.ID == list.ID;
         using var node = M3Tree.Node($"##list_{list.ID}", list.Name, isHighlighted, true,
             list.Ephemeral ? FontAwesomeIcon.HourglassHalf : FontAwesomeIcon.ClipboardList,
-            tooltip: list.Ephemeral ? $"{list.Name}\nEphemeral: deleted after crafting completes." : null,
+            tooltip: list.Ephemeral ? $"{list.Name}\n临时清单：制作完成后自动删除。" : null,
             trailing: list.Recipes.Count.ToString());
         if (node.Clicked)
         {
@@ -326,24 +326,24 @@ public partial class VulcanWindow
             return;
         }
 
-        if (M3Menu.Item("##list_edit", "Open", FontAwesomeIcon.Pen))
+        if (M3Menu.Item("##list_edit", "打开", FontAwesomeIcon.Pen))
         {
             OpenCraftingList(list);
         }
 
         var artisanLoaded = IPCSubscriber.IsReady("Artisan");
-        if (M3Menu.Item("##list_start", "Start crafting", FontAwesomeIcon.Play, !artisanLoaded, tooltip: artisanLoaded ? ArtisanLoadedTooltip : null))
+        if (M3Menu.Item("##list_start", "开始制作", FontAwesomeIcon.Play, !artisanLoaded, tooltip: artisanLoaded ? ArtisanLoadedTooltip : null))
         {
             StartCraftingList(list);
         }
 
         var picked = false;
-        using (var move = M3Menu.BeginSub("##list_move", "Move to folder", FontAwesomeIcon.FolderOpen))
+        using (var move = M3Menu.BeginSub("##list_move", "移动到文件夹", FontAwesomeIcon.FolderOpen))
         {
             if (move.IsOpen)
             {
                 var isRoot = string.IsNullOrEmpty(list.FolderPath);
-                if (M3Menu.Item("##move_root", "No folder", selected: isRoot))
+                if (M3Menu.Item("##move_root", "无文件夹", selected: isRoot))
                 {
                     picked = true;
                     if (!isRoot)
@@ -372,18 +372,18 @@ public partial class VulcanWindow
             M3Menu.Close();
         }
 
-        if (M3Menu.Item("##list_export", "Copy export string", FontAwesomeIcon.Copy))
+        if (M3Menu.Item("##list_export", "复制导出字符串", FontAwesomeIcon.Copy))
         {
             CopyListExport(list);
         }
 
-        if (M3Menu.Item("##list_export_teamcraft", "Copy TeamCraft link", FontAwesomeIcon.Link))
+        if (M3Menu.Item("##list_export_teamcraft", "复制 TeamCraft 链接", FontAwesomeIcon.Link))
         {
             CopyTeamCraftLink(list);
         }
 
         M3Menu.Divider();
-        if (M3Menu.Item("##list_delete", "Delete...", FontAwesomeIcon.Trash))
+        if (M3Menu.Item("##list_delete", "删除…", FontAwesomeIcon.Trash))
         {
             _pendingDeleteListId = list.ID;
             _openDeleteListDialog = true;
@@ -395,13 +395,13 @@ public partial class VulcanWindow
         var exported = GatherBuddy.CraftingListManager.ExportList(list.ID);
         if (exported == null)
         {
-            M3Snackbar.Show($"Couldn't export {list.Name}.", severity: M3Severity.Error);
+            M3Snackbar.Show($"无法导出 {list.Name}。", severity: M3Severity.Error);
             return;
         }
 
         ImGui.SetClipboardText(exported);
         GatherBuddy.Log.Information($"[VulcanWindow] Exported list '{list.Name}' to clipboard");
-        M3Snackbar.Show($"Copied the export string for {list.Name}.", severity: M3Severity.Success);
+        M3Snackbar.Show($"已复制 {list.Name} 的导出字符串。", severity: M3Severity.Success);
     }
 
     internal static void CopyTeamCraftLink(CraftingListDefinition list)
@@ -411,12 +411,12 @@ public partial class VulcanWindow
         {
             ImGui.SetClipboardText(exported);
             GatherBuddy.Log.Information($"[VulcanWindow] Exported list '{list.Name}' to TeamCraft and copied the link to the clipboard");
-            M3Snackbar.Show($"Copied a TeamCraft link for {list.Name}.", severity: M3Severity.Success);
+            M3Snackbar.Show($"已复制 {list.Name} 的 TeamCraft 链接。", severity: M3Severity.Success);
         }
         else if (!string.IsNullOrEmpty(error))
         {
             GatherBuddy.Log.Warning($"[VulcanWindow] Failed to export '{list.Name}' to TeamCraft: {error}");
-            M3Snackbar.Show($"Couldn't make a TeamCraft link: {error}", severity: M3Severity.Error);
+            M3Snackbar.Show($"无法创建 TeamCraft 链接：{error}", severity: M3Severity.Error);
         }
     }
 
@@ -428,7 +428,7 @@ public partial class VulcanWindow
         }
 
         GatherBuddy.CraftingListManager.DeleteList(list.ID);
-        M3Snackbar.Show($"Deleted {list.Name}.");
+        M3Snackbar.Show($"已删除 {list.Name}。");
     }
 
     private void DrawDeleteListDialog()
@@ -440,9 +440,9 @@ public partial class VulcanWindow
 
         var list = _pendingDeleteListId is int listId ? GatherBuddy.CraftingListManager.GetListByID(listId) : null;
         var supporting = list == null
-            ? "This list no longer exists."
+            ? "此清单已不存在。"
             : $"{list.Name} and its {list.Recipes.Count} {(list.Recipes.Count == 1 ? "recipe" : "recipes")} will be removed. This can't be undone.";
-        using var dialog = M3Dialog.Begin(DeleteListDialogId, "Delete this list?", supporting, FontAwesomeIcon.Trash);
+        using var dialog = M3Dialog.Begin(DeleteListDialogId, "删除此清单？", supporting, FontAwesomeIcon.Trash);
         if (!dialog.IsOpen)
         {
             return;
@@ -450,8 +450,8 @@ public partial class VulcanWindow
 
         var pressed = M3Dialog.Actions(
         [
-            new M3DialogAction("Cancel"),
-            new M3DialogAction("Delete", M3ButtonStyle.Danger, FontAwesomeIcon.Trash, list != null),
+            new M3DialogAction("取消"),
+            new M3DialogAction("删除", M3ButtonStyle.Danger, FontAwesomeIcon.Trash, list != null),
         ]);
         if (pressed == 1 && list != null)
         {
@@ -475,8 +475,8 @@ public partial class VulcanWindow
         if (_previewList == null)
         {
             ImGui.Dummy(new Vector2(0f, M3.Space3 * 2f));
-            M3Widgets.EmptyState("##crafting_list_preview_none", "Nothing to preview",
-                "Hover a list or folder to preview it. Click a list to open it.", FontAwesomeIcon.MousePointer);
+            M3Widgets.EmptyState("##crafting_list_preview_none", "没有可预览的项目",
+                "悬停在清单或文件夹上可预览，点击清单可打开。", FontAwesomeIcon.MousePointer);
             return;
         }
 
@@ -490,7 +490,7 @@ public partial class VulcanWindow
         _previewList = list;
         DrawListPreviewHeader(list);
         DrawListPreviewActions(list);
-        M3Widgets.SectionLabel("Recipes");
+        M3Widgets.SectionLabel("配方");
 
         using var recipes = ImRaii.Child("##previewRecipeList", new Vector2(-1f, 0f), false);
         if (recipes)
@@ -516,8 +516,8 @@ public partial class VulcanWindow
         M3Text.Draw(details, M3TextStyle.Muted, true);
         if (list.Ephemeral)
         {
-            M3Widgets.Pill("##preview_ephemeral", "Ephemeral", M3.Scheme.Tertiary, FontAwesomeIcon.HourglassHalf,
-                "Deleted automatically after crafting completes.");
+            M3Widgets.Pill("##preview_ephemeral", "临时清单", M3.Scheme.Tertiary, FontAwesomeIcon.HourglassHalf,
+                "制作完成后自动删除。");
         }
 
         if (!string.IsNullOrWhiteSpace(list.Description))
@@ -531,10 +531,10 @@ public partial class VulcanWindow
 
     private void DrawListPreviewActions(CraftingListDefinition list)
     {
-        const string openLabel = "Open";
-        const string startLabel = "Start crafting";
-        const string exportLabel = "Copy export";
-        const string deleteLabel = "Delete";
+        const string openLabel = "打开";
+        const string startLabel = "开始制作";
+        const string exportLabel = "复制导出字符串";
+        const string deleteLabel = "删除";
 
         var artisanLoaded = IPCSubscriber.IsReady("Artisan");
         var flow = new M3Flow();
@@ -554,14 +554,14 @@ public partial class VulcanWindow
 
         flow.Next(M3Widgets.ButtonWidth(FontAwesomeIcon.Copy, exportLabel));
         if (M3Widgets.Button("##preview_export", exportLabel, M3ButtonStyle.Text, FontAwesomeIcon.Copy,
-                tooltip: "Copy this list's export string to the clipboard"))
+                tooltip: "将此清单的导出字符串复制到剪贴板"))
         {
             CopyListExport(list);
         }
 
         flow.Next(M3Widgets.ButtonWidth(FontAwesomeIcon.Trash, deleteLabel));
         if (M3Widgets.HoldButton("##preview_delete", deleteLabel, CraftingListHoldSeconds, M3ButtonStyle.Danger, FontAwesomeIcon.Trash,
-                tooltip: "Hold to delete this list"))
+                tooltip: "按住以删除此清单"))
         {
             DeleteCraftingList(list);
         }
@@ -573,7 +573,7 @@ public partial class VulcanWindow
     {
         if (list.Recipes.Count == 0)
         {
-            M3Text.Draw("No recipes in this list yet.", M3TextStyle.Muted);
+            M3Text.Draw("清单中尚无配方。", M3TextStyle.Muted);
             return;
         }
 
@@ -656,8 +656,8 @@ public partial class VulcanWindow
             M3TextStyle.Muted, true);
         ImGui.Dummy(new Vector2(0f, M3.Space1));
 
-        const string newListLabel = "New list here";
-        const string newFolderLabel = "New subfolder";
+        const string newListLabel = "在此新建清单";
+        const string newFolderLabel = "新建子文件夹";
         var flow = new M3Flow();
         flow.Next(M3Widgets.ButtonWidth(FontAwesomeIcon.Plus, newListLabel));
         if (M3Widgets.Button("##folder_preview_new_list", newListLabel, M3ButtonStyle.Tonal, FontAwesomeIcon.Plus))
@@ -673,7 +673,7 @@ public partial class VulcanWindow
         }
 
         ImGui.Dummy(new Vector2(0f, M3.Space1));
-        M3Widgets.SectionLabel("Lists");
+        M3Widgets.SectionLabel("清单");
         using var child = ImRaii.Child("##previewFolderList", new Vector2(-1f, 0f), false);
         if (!child)
         {
@@ -682,7 +682,7 @@ public partial class VulcanWindow
 
         if (entries.Count == 0)
         {
-            M3Text.Draw("No lists in this folder.", M3TextStyle.Muted);
+            M3Text.Draw("此文件夹中没有清单。", M3TextStyle.Muted);
             return;
         }
 
@@ -690,7 +690,7 @@ public partial class VulcanWindow
         {
             var recipes = list.Recipes.Count;
             using var node = M3Tree.Node($"##folder_preview_{list.ID}", label, leaf: true, icon: FontAwesomeIcon.ClipboardList,
-                tooltip: "Click to open this list", trailing: $"{recipes} {(recipes == 1 ? "recipe" : "recipes")}");
+                tooltip: "点击打开此清单", trailing: $"{recipes} {(recipes == 1 ? "recipe" : "recipes")}");
             if (node.Clicked)
             {
                 OpenCraftingList(list);

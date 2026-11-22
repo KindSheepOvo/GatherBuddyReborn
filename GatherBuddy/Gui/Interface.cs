@@ -36,8 +36,8 @@ public partial class Interface : M3ShellWindow, IDisposable
 
     private static readonly M3WindowAction[] MainWindowActions =
     [
-        new("##gbr_open_vulcan", FontAwesomeIcon.Hammer, "Open Vulcan, the crafting window"),
-        new("##gbr_open_collectables", FontAwesomeIcon.BoxOpen, "Open the collectables window"),
+        new("##gbr_open_vulcan", FontAwesomeIcon.Hammer, "打开 Vulcan 制作窗口"),
+        new("##gbr_open_collectables", FontAwesomeIcon.BoxOpen, "打开收藏品窗口"),
     ];
 
     private static GatherBuddy _plugin = null!;
@@ -101,45 +101,45 @@ public partial class Interface : M3ShellWindow, IDisposable
 
     private void BuildPages()
     {
-        AddPage(new M3Page(ItemsPageId, "Gatherables", FontAwesomeIcon.Seedling, SectionBrowse,
-            "Every item miners and botanists can gather, with where and when to find it", Panels(DrawItemPage), false,
-            tooltip: "Breaking rocks with a pickaxe or felling trees counts as gathering, why do you ask?"));
-        AddPage(new M3Page(FishPageId, "Fish", FontAwesomeIcon.Fish, SectionBrowse,
-            "Every fish, with its bait, conditions and uptimes", Panels(DrawFishPage), false,
-            tooltip: "There are plenty of fish in the sea. And the air. And the sand. And the lava. And space, for some reason."));
-        AddPage(new M3Page("weather", "Weather", FontAwesomeIcon.CloudSun, SectionBrowse,
-            "The weather forecast in every zone for the coming days, and the last weather", Panels(DrawWeatherPage), false,
-            tooltip: "Yes, 'Gloom' is weather."));
-        AddPage(new M3Page("locations", "Locations", FontAwesomeIcon.MapMarkedAlt, SectionBrowse,
-            "Custom aetherytes and map marker locations for specific nodes", Panels(DrawLocationsPage), false));
+        AddPage(new M3Page(ItemsPageId, "采集物品", FontAwesomeIcon.Seedling, SectionBrowse,
+            "查看采矿工和园艺工能采集的物品，以及出现地点和时间", Panels(DrawItemPage), false,
+            tooltip: "用镐凿石或砍伐树木都算采集。怎么突然问这个？"));
+        AddPage(new M3Page(FishPageId, "鱼类", FontAwesomeIcon.Fish, SectionBrowse,
+            "查看鱼类、鱼饵、出现条件和可钓时间", Panels(DrawFishPage), false,
+            tooltip: "海里有很多鱼。天上、沙里、岩浆里，甚至宇宙里也有。"));
+        AddPage(new M3Page("weather", "天气", FontAwesomeIcon.CloudSun, SectionBrowse,
+            "查看各区域接下来几天的天气预报和上一时段天气", Panels(DrawWeatherPage), false,
+            tooltip: "没错，「妖雾」也是一种天气。"));
+        AddPage(new M3Page("locations", "自定义地点", FontAwesomeIcon.MapMarkedAlt, SectionBrowse,
+            "为特定采集点自定义以太之光和地图标记位置", Panels(DrawLocationsPage), false));
 
-        AddPage(new M3Page(AutoGatherPageId, "Auto-Gather", FontAwesomeIcon.Robot, SectionPlan,
-            "Lists of items for auto-gather to collect", Panels(DrawAutoGatherPage), false,
-            tooltip: "You read that right! Auto-gather!"));
-        AddPage(new M3Page("alarms", "Alarms", FontAwesomeIcon.Bell, SectionPlan,
-            "Alarms that tell you when nodes and fish come up", Panels(DrawAlarmPage), false,
-            tooltip: "Do you often find yourself late for a very important date? Set up your very own alarm clock."));
-        AddPage(new M3Page("gather_groups", "Gather Groups", FontAwesomeIcon.LayerGroup, SectionPlan,
-            "Gather different things depending on the time of day, and share them with others", Panels(DrawGatherGroupPage), false));
-        AddPage(new M3Page("gather_window", "Gather Window", FontAwesomeIcon.ListUl, SectionPlan,
-            "Presets for the small window that shows only the items you care about", Panels(DrawGatherWindowPage), false));
+        AddPage(new M3Page(AutoGatherPageId, "自动采集", FontAwesomeIcon.Robot, SectionPlan,
+            "管理自动采集的物品清单", Panels(DrawAutoGatherPage), false,
+            tooltip: "你没看错，就是自动采集！"));
+        AddPage(new M3Page("alarms", "提醒", FontAwesomeIcon.Bell, SectionPlan,
+            "在采集点或鱼类出现时提醒你", Panels(DrawAlarmPage), false,
+            tooltip: "常常错过重要时间？设置自己的提醒吧。"));
+        AddPage(new M3Page("gather_groups", "采集组", FontAwesomeIcon.LayerGroup, SectionPlan,
+            "按时段安排采集内容，并与他人分享采集组", Panels(DrawGatherGroupPage), false));
+        AddPage(new M3Page("gather_window", "采集窗口", FontAwesomeIcon.ListUl, SectionPlan,
+            "为仅显示关注物品的采集窗口设置预设", Panels(DrawGatherWindowPage), false));
 
-        AddPage(new M3Page("fish_records", "Fish Records", FontAwesomeIcon.Book, SectionFishing,
-            "Find, clean up and share the fishing data you have collected", Panels(DrawRecordPage), false));
-        AddPage(new M3Page("fish_stats", "Fishing Spot Stats", FontAwesomeIcon.ChartBar, SectionFishing,
-            "Your fish records summed up per fishing spot", Panels(DrawStatsPage), false, () => GatherBuddy.Config.EnableFishStats));
+        AddPage(new M3Page("fish_records", "钓鱼记录", FontAwesomeIcon.Book, SectionFishing,
+            "查找、整理和分享已收集的钓鱼记录", Panels(DrawRecordPage), false));
+        AddPage(new M3Page("fish_stats", "钓场统计", FontAwesomeIcon.ChartBar, SectionFishing,
+            "按钓场汇总你的钓鱼记录", Panels(DrawStatsPage), false, () => GatherBuddy.Config.EnableFishStats));
 
         foreach (var page in _settings.Pages)
         {
             AddPage(new M3Page(page.Id, page.Label, page.Icon, SectionSettings, page.Description, page.Draw));
         }
 
-        AddPage(new M3Page(ConfigPresetsPageId, "Config Presets", FontAwesomeIcon.SlidersH, SectionSettings,
-            "Which actions and consumables auto-gather uses, for which items", DrawConfigPresetsPage, false));
+        AddPage(new M3Page(ConfigPresetsPageId, "配置预设", FontAwesomeIcon.SlidersH, SectionSettings,
+            "按物品配置自动采集时使用的技能和消耗品", DrawConfigPresetsPage, false));
 
-        AddPage(new M3Page("debug", "Debug", FontAwesomeIcon.Bug, SectionTools,
-            "Internal data, for troubleshooting", Panels(DrawDebugPage), false, tool: true,
-            tooltip: "I really hope there is a good reason for you seeing this."));
+        AddPage(new M3Page("debug", "调试", FontAwesomeIcon.Bug, SectionTools,
+            "查看用于故障排查的内部数据", Panels(DrawDebugPage), false, tool: true,
+            tooltip: "希望你是为了排查问题才打开这里。"));
     }
 
     private static Action Panels(Action draw)
@@ -159,7 +159,7 @@ public partial class Interface : M3ShellWindow, IDisposable
             case 0:
                 if (GatherBuddy.VulcanWindow == null)
                 {
-                    M3Snackbar.Show("The Vulcan window isn't available.", severity: M3Severity.Error);
+                    M3Snackbar.Show("Vulcan 窗口不可用。", severity: M3Severity.Error);
                 }
                 else
                 {
@@ -170,7 +170,7 @@ public partial class Interface : M3ShellWindow, IDisposable
             case 1:
                 if (GatherBuddy.CollectablesWindow == null)
                 {
-                    M3Snackbar.Show("The collectables window isn't available.", severity: M3Severity.Error);
+                    M3Snackbar.Show("收藏品窗口不可用。", severity: M3Severity.Error);
                 }
                 else
                 {
@@ -230,13 +230,13 @@ public partial class Interface : M3ShellWindow, IDisposable
         => true;
 
     protected override string SearchHint
-        => "Search settings";
+        => "搜索设置";
 
     protected override void OnSearchChanged(string text)
         => _settings.UpdateSearch(text);
 
     protected override string SearchSubtitle(string text)
-        => _settings.ResultCount == 1 ? "1 matching group of settings" : $"{_settings.ResultCount} matching groups of settings";
+        => _settings.ResultCount == 1 ? "找到 1 组匹配的设置" : $"找到 {_settings.ResultCount} 组匹配的设置";
 
     protected override void DrawSearchResults(string text)
     {

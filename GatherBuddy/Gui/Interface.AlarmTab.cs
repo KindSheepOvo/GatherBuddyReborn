@@ -17,10 +17,10 @@ namespace GatherBuddy.Gui;
 public partial class Interface
 {
     private static string CheckUnnamed(string name)
-        => name.Length > 0 ? name : "<Unnamed>";
+        => name.Length > 0 ? name : "<未命名>";
 
     private static string CheckUndescribed(string desc)
-        => desc.Length > 0 ? desc : "<No Description>";
+        => desc.Length > 0 ? desc : "<无描述>";
 
     private class AlarmWindowDragDropData(AlarmGroup group, Alarm alarm, int idx)
     {
@@ -120,7 +120,7 @@ public partial class Interface
 
         public static readonly Sounds[] SoundIds = Array.FindAll(Enum.GetValues<Sounds>(), s => s != Sounds.Unknown);
 
-        public static readonly string[] SoundIdNames = Array.ConvertAll(SoundIds, s => s == Sounds.None ? "No Sound" : $"Sound {s.ToIdx()}");
+        public static readonly string[] SoundIdNames = Array.ConvertAll(SoundIds, s => s == Sounds.None ? "无音效" : $"音效 {s.ToIdx()}");
 
         public readonly AlarmSelector Selector = new(manager);
 
@@ -145,6 +145,7 @@ public partial class Interface
     private readonly AlarmCache _alarmCache;
 
     private static readonly string[] AlarmColumns = ["##delete", "Name", "On", "Item", "Seconds early", "Chat", "Sound", "Location", "Next"];
+    private static readonly string[] AlarmColumnLabels = ["", "名称", "启用", "物品", "提前秒数", "聊天", "音效", "地点", "下次触发"];
 
     private static float AlarmItemWidth
         => SetInputWidth * 1.15f;
@@ -155,7 +156,7 @@ public partial class Interface
     private static bool DrawTimedItemCombo(string id, ref int index)
     {
         var items = GatherBuddy.UptimeManager.TimedGatherables;
-        return M3Widgets.Combo(id, ref index, items.Length, i => items[i].Name[GatherBuddy.Language], AlarmItemWidth, "Choose an item", true);
+        return M3Widgets.Combo(id, ref index, items.Length, i => items[i].Name[GatherBuddy.Language], AlarmItemWidth, "选择物品", true);
     }
 
     private void DrawAlarmInfo(ref int alarmIdx, AlarmGroup group)
@@ -167,7 +168,7 @@ public partial class Interface
         ImGui.TableNextRow();
         ImGui.TableNextColumn();
         Ui.CenterInRow(rowHeight, ImGui.GetFrameHeight());
-        if (M3Widgets.IconButton("##delete", FontAwesomeIcon.Trash, "Delete this alarm", diameter: ImGui.GetFrameHeight()))
+        if (M3Widgets.IconButton("##delete", FontAwesomeIcon.Trash, "删除此闹钟", diameter: ImGui.GetFrameHeight()))
         {
             _plugin.AlarmManager.DeleteAlarm(group, alarmIdx--);
             return;
@@ -180,7 +181,7 @@ public partial class Interface
             _plugin.AlarmManager.ChangeAlarmName(group, alarmIdx, name);
         }
 
-        M3Tooltip.Hovered("Names are optional and can be used in the alarm message that is printed to chat.");
+        M3Tooltip.Hovered("名称可留空，可在发送到聊天栏的闹钟消息中使用。");
 
         ImGui.TableNextColumn();
         Ui.CenterInRow(rowHeight, M3Widgets.CheckboxHitSize().Y);
@@ -190,7 +191,7 @@ public partial class Interface
             _plugin.AlarmManager.ToggleAlarm(group, alarmIdx);
         }
 
-        M3Tooltip.Hovered("Enable this alarm.");
+        M3Tooltip.Hovered("启用此闹钟。");
 
         ImGui.TableNextColumn();
         Ui.CenterInRow(rowHeight, M3Widgets.ComboHeight);
@@ -211,7 +212,7 @@ public partial class Interface
             _plugin.AlarmManager.ChangeAlarmOffset(group, alarmIdx, Math.Clamp(secondOffset, 0, RealTime.SecondsPerDay));
         }
 
-        M3Tooltip.Hovered("Trigger this alarm this many seconds before the item is next available.");
+        M3Tooltip.Hovered("在物品下次可采集前提前指定秒数触发闹钟。");
 
         ImGui.TableNextColumn();
         Ui.CenterInRow(rowHeight, M3Widgets.CheckboxHitSize().Y);
@@ -221,12 +222,12 @@ public partial class Interface
             _plugin.AlarmManager.ChangeAlarmMessage(group, alarmIdx, printMessage);
         }
 
-        M3Tooltip.Hovered("Print a chat message when this alarm is triggered.");
+        M3Tooltip.Hovered("闹钟触发时在聊天栏显示消息。");
 
         ImGui.TableNextColumn();
         Ui.CenterInRow(rowHeight, M3Widgets.ComboHeight);
         var soundIdx = Array.IndexOf(AlarmCache.SoundIds, alarm.SoundId);
-        if (M3Widgets.Combo("##sound", ref soundIdx, AlarmCache.SoundIdNames, AlarmSoundWidth, tooltip: "The sound played when this alarm is triggered."))
+        if (M3Widgets.Combo("##sound", ref soundIdx, AlarmCache.SoundIdNames, AlarmSoundWidth, tooltip: "闹钟触发时播放的音效。"))
         {
             _plugin.AlarmManager.ChangeAlarmSound(group, alarmIdx, AlarmCache.SoundIds[soundIdx]);
             AlarmManager.PreviewAlarm(AlarmCache.SoundIds[soundIdx]);
@@ -250,19 +251,19 @@ public partial class Interface
         }
         else
         {
-            Ui.Framed("Triggered now", ColorId.ChangedLocationBg.Value(), size);
+            Ui.Framed("正在触发", ColorId.ChangedLocationBg.Value(), size);
         }
     }
 
     private static void DrawGroupData(AlarmGroup group, int idx)
     {
-        if (Ui.CommitField("##groupName", "Name", group.Name, out var newName, SetInputWidth, 64))
+        if (Ui.CommitField("##groupName", "名称", group.Name, out var newName, SetInputWidth, 64))
         {
             _plugin.AlarmManager.ChangeGroupName(idx, newName);
         }
 
         ImGui.SameLine(0, M3.Space2);
-        if (Ui.CommitField("##groupDesc", "Description", group.Description, out var newDesc, 2 * SetInputWidth, 128))
+        if (Ui.CommitField("##groupDesc", "描述", group.Description, out var newDesc, 2 * SetInputWidth, 128))
         {
             _plugin.AlarmManager.ChangeGroupDescription(idx, newDesc);
         }
@@ -275,9 +276,9 @@ public partial class Interface
             _plugin.AlarmManager.ToggleGroup(idx);
         }
 
-        M3Tooltip.Hovered("Enable this alarm group. Only the alarms in it that are enabled themselves count as active.");
+        M3Tooltip.Hovered("启用此闹钟组。组内只有单独启用的闹钟才会生效。");
         ImGui.SameLine(0, M3.Space2);
-        Ui.RowText(enabled ? "Enabled" : "Disabled", M3TextField.Height, M3TextStyle.Muted);
+        Ui.RowText(enabled ? "已启用" : "已禁用", M3TextField.Height, M3TextStyle.Muted);
     }
 
     private static void DrawAlarmTableHeader(AlarmGroup group)
@@ -314,13 +315,13 @@ public partial class Interface
                     }
                 }
 
-                M3Tooltip.Hovered("Enable all alarms, or disable all alarms.");
+                M3Tooltip.Hovered("启用或禁用全部闹钟。");
                 continue;
             }
 
             if (!AlarmColumns[i].StartsWith("##"))
             {
-                Ui.TableHeader(AlarmColumns[i], headerHeight);
+                Ui.TableHeader(AlarmColumnLabels[i], headerHeight);
             }
         }
     }
@@ -351,13 +352,13 @@ public partial class Interface
         ImGui.TableNextRow();
         ImGui.TableNextColumn();
         Ui.CenterInRow(rowHeight, ImGui.GetFrameHeight());
-        if (M3Widgets.IconButton("##add", FontAwesomeIcon.Plus, "Add this alarm", M3ButtonStyle.Tonal, diameter: ImGui.GetFrameHeight()))
+        if (M3Widgets.IconButton("##add", FontAwesomeIcon.Plus, "添加闹钟", M3ButtonStyle.Tonal, diameter: ImGui.GetFrameHeight()))
         {
             _plugin.AlarmManager.AddAlarm(group, _alarmCache.CreateAlarm());
         }
 
         ImGui.TableNextColumn();
-        M3TextField.Draw("##name", "Name of the new alarm", ref _alarmCache.NewName, SetInputWidth, 64);
+        M3TextField.Draw("##name", "新闹钟名称", ref _alarmCache.NewName, SetInputWidth, 64);
         ImGui.TableNextColumn();
         Ui.CenterInRow(rowHeight, M3Widgets.CheckboxHitSize().Y);
         M3Widgets.Checkbox("##enabled", ref _alarmCache.NewEnabled);
@@ -386,32 +387,32 @@ public partial class Interface
         var current = _alarmCache.Selector.Current;
         var row = new Ui.Row(M3Widgets.ButtonHeight);
         row.Place(M3Widgets.IconButtonSize);
-        if (M3Widgets.IconButton("##copy", FontAwesomeIcon.Copy, "Copy this alarm group to your clipboard", enabled: current != null))
+        if (M3Widgets.IconButton("##copy", FontAwesomeIcon.Copy, "将此闹钟组复制到剪贴板", enabled: current != null))
         {
             try
             {
                 var s = new AlarmGroup.Config(current!).ToBase64();
                 ImGui.SetClipboardText(s);
-                Communicator.PrintClipboardMessage("Alarm Group ", current!.Name);
+                Communicator.PrintClipboardMessage("闹钟组 ", current!.Name);
             }
             catch (Exception e)
             {
                 GatherBuddy.Log.Error($"Could not write Alarm Group {current!.Name} to Clipboard:\n{e}");
-                Communicator.PrintClipboardMessage("Alarm Group ", current!.Name, e);
+                Communicator.PrintClipboardMessage("闹钟组 ", current!.Name, e);
             }
         }
 
         row.Next(M3Widgets.ButtonHeight, M3.Space1);
-        if (M3Widgets.Button("##preset", "Make gather window preset", M3ButtonStyle.Text, FontAwesomeIcon.ListUl, enabled: current != null,
-                tooltip: "Create a new gather window preset from this alarm group."))
+        if (M3Widgets.Button("##preset", "创建采集窗口预设", M3ButtonStyle.Text, FontAwesomeIcon.ListUl, enabled: current != null,
+                tooltip: "根据此闹钟组创建新的采集窗口预设。"))
         {
             _plugin.GatherWindowManager.AddPreset(new GatherWindowPreset(current!));
-            M3Snackbar.Show("Created a gather window preset.");
+            M3Snackbar.Show("已创建采集窗口预设。");
         }
 
         row.Next(ImGui.GetFrameHeight(), M3.Space2);
-        M3Widgets.HelpMarker("Use /gather alarm to gather the last item alarm triggered.\n"
-          + "Use /gatherfish alarm to gather the last fish alarm triggered.");
+        M3Widgets.HelpMarker("使用 /gather alarm 采集上次触发闹钟的物品。\n"
+          + "使用 /gatherfish alarm 钓取上次触发闹钟的鱼。");
     }
 
     private void DrawAlarmPage()
@@ -428,7 +429,7 @@ public partial class Interface
             }
             else
             {
-                M3Widgets.EmptyState("##noAlarms", "No alarm group selected", "Add a group with the plus button below the list.", FontAwesomeIcon.Bell);
+                M3Widgets.EmptyState("##noAlarms", "未选择闹钟组", "点击列表下方的加号添加组。", FontAwesomeIcon.Bell);
             }
         });
     }

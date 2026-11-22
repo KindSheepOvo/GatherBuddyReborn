@@ -54,7 +54,10 @@ public partial class Interface
         private sealed class ZoneHeader : ColumnString<CachedWeather>
         {
             public ZoneHeader()
-                => Label = "Filter zones";
+            {
+                Label = "Filter zones";
+                LocalizedLabel = "筛选区域";
+            }
 
             public override float Width
                 => _zoneSize * ImGuiHelpers.GlobalScale;

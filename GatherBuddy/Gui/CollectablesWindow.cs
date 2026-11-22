@@ -110,8 +110,8 @@ public sealed class CollectablesWindow : M3PanelWindow
 
     private static void DrawTurnInCard(CollectableManager manager, CollectableConfig config)
     {
-        using var card = M3Card.Begin("collectables_turn_in", "Turn-ins", FontAwesomeIcon.ExchangeAlt, M3.AccentFor(0), M3CardStyle.Filled,
-            "Shared collectables turn-ins and purchase automation for Auto-Gather and Vulcan.");
+        using var card = M3Card.Begin("collectables_turn_in", "交付", FontAwesomeIcon.ExchangeAlt, M3.AccentFor(0), M3CardStyle.Filled,
+            "为自动采集和 Vulcan 提供共用的收藏品自动交付与购买。");
 
         var turnInsAvailable = CollectableTurnInRequirements.IsAvailable;
         if (!turnInsAvailable)
@@ -124,13 +124,13 @@ public sealed class CollectablesWindow : M3PanelWindow
         if (!config.AutoTurnInCollectables && !string.IsNullOrWhiteSpace(config.AutoTurnInHardFailReason))
         {
             M3Widgets.Banner("##collectables_hard_fail",
-                $"Auto turnins were disabled after a collectables failure: {config.AutoTurnInHardFailReason}", M3Severity.Error,
+                $"收藏品处理失败，已关闭自动交付：{config.AutoTurnInHardFailReason}", M3Severity.Error,
                 FontAwesomeIcon.ExclamationCircle);
             ImGui.Dummy(new Vector2(0f, M3.Space1));
         }
 
         var running = manager.IsRunning;
-        var buttonLabel = running ? "Stop run" : "Run turn-ins";
+        var buttonLabel = running ? "停止交付" : "开始交付";
         var buttonIcon = running ? FontAwesomeIcon.Stop : FontAwesomeIcon.Play;
         var pill = M3Widgets.PluginPillSize(RequiredCollectablePlugins, true);
         var button = new Vector2(M3Widgets.ButtonWidth(buttonIcon, buttonLabel), M3Widgets.ButtonHeight);
@@ -207,16 +207,16 @@ public sealed class CollectablesWindow : M3PanelWindow
 
     private static void DrawRouteCard(IReadOnlyList<CollectableTurnInRouteOption> routes, CollectableTurnInRouteOption? selectedRoute)
     {
-        using var card = M3Card.Begin("collectables_route", "Turn-in route", FontAwesomeIcon.Route, M3.AccentFor(2), M3CardStyle.Filled,
-            "Where collectables runs go to turn in.");
+        using var card = M3Card.Begin("collectables_route", "交付路线", FontAwesomeIcon.Route, M3.AccentFor(2), M3CardStyle.Filled,
+            "选择收藏品交付地点。");
 
         if (routes.Count == 0)
         {
             var status = CollectableTurnInRouteResolver.HasLookupData
                 ? VendorNpcLocationCache.IsInitializing
-                    ? "Collectables route locations are still loading."
-                    : "No collectables turn-in routes are available right now."
-                : "Collectables route data is unavailable.";
+                    ? "收藏品交付地点仍在加载。"
+                    : "目前没有可用的收藏品交付路线。"
+                : "收藏品交付路线数据不可用。";
             M3Text.Draw(status, M3TextStyle.Muted, true);
             return;
         }
@@ -235,8 +235,8 @@ public sealed class CollectablesWindow : M3PanelWindow
         }
 
         var supporting = selectedRoute != null
-            ? $"NPC: {selectedRoute.Vendor.Name} · Territory: {selectedRoute.ZoneName} · Source: {selectedRoute.Location.Source}"
-            : "Pick where collectables runs turn in.";
+            ? $"NPC：{selectedRoute.Vendor.Name} · 区域：{selectedRoute.ZoneName} · 来源：{selectedRoute.Location.Source}"
+            : "选择交付收藏品的位置。";
         var previous = index;
         if (M3Widgets.RowCombo("Preferred turn-in route", ref index, routes.Count, i => routes[i].DisplayName, supporting, search: routes.Count > 8)
          && index != previous && index >= 0 && index < routes.Count)
@@ -256,8 +256,8 @@ public sealed class CollectablesWindow : M3PanelWindow
     private static void DrawPurchaseCard(CollectableConfig config, VendorBuyListDefinition? selectedGatheringList,
         VendorBuyListDefinition? selectedCraftingList)
     {
-        using var card = M3Card.Begin("collectables_purchase", "Purchase lists", FontAwesomeIcon.ShoppingCart, M3.AccentFor(0), M3CardStyle.Filled,
-            "The vendor buy lists that collectables runs spend scrips on.");
+        using var card = M3Card.Begin("collectables_purchase", "购买清单", FontAwesomeIcon.ShoppingCart, M3.AccentFor(0), M3CardStyle.Filled,
+            "选择收藏品交付后消耗工票时使用的购买清单。");
 
         SettingRows.Number("Reserve scrips", "Keep at least this many of each scrip when buy lists spend scrips.",
             config.ReserveScripAmount, 0, 4000, v => config.ReserveScripAmount = v, 50);
@@ -281,7 +281,7 @@ public sealed class CollectablesWindow : M3PanelWindow
         var index = selectedListId == Guid.Empty ? 0 : lists.FindIndex(list => list.Id == selectedListId) + 1;
         var supporting = selectedList != null ? $"{purpose} {GetPurchaseListSummary(selectedList)}." : purpose;
         var previous = index;
-        if (M3Widgets.RowCombo($"{label}##{label}", ref index, lists.Count + 1, i => i == 0 ? "No list selected" : lists[i - 1].Name, supporting,
+        if (M3Widgets.RowCombo($"{label}##{label}", ref index, lists.Count + 1, i => i == 0 ? "未选择清单" : lists[i - 1].Name, supporting,
                 search: lists.Count > 8)
          && index != previous && index >= 0 && index <= lists.Count)
         {
@@ -291,7 +291,7 @@ public sealed class CollectablesWindow : M3PanelWindow
 
         var active = VendorBuyListManager.ActiveList;
         using var sub = M3SubGroup.Begin();
-        if (M3Widgets.RowButton($"Use the active vendor list##{label}_active", "Use active list",
+        if (M3Widgets.RowButton($"Use the active vendor list##{label}_active", "使用当前清单",
                 active != null ? $"The active list is {active.Name}." : "There is no active vendor list.", M3ButtonStyle.Text, FontAwesomeIcon.ArrowLeft,
                 active != null && active.Id != selectedListId)
          && active != null)
@@ -315,13 +315,13 @@ public sealed class CollectablesWindow : M3PanelWindow
         if (!CollectableInventoryHelper.IsTurnInItemMetadataReady)
         {
             M3Text.Draw(CollectableInventoryHelper.IsTurnInItemMetadataLoading
-                ? "Collectables item data is still loading."
-                : "Collectables item data is unavailable.", M3TextStyle.Muted, true);
+                ? "收藏品数据仍在加载。"
+                : "收藏品数据不可用。", M3TextStyle.Muted, true);
         }
         else
         {
             var thresholdState = CollectableInventoryHelper.GetThresholdState(GatherBuddy.Config.CollectableConfig);
-            M3Widgets.RowValue("Collectables carried", thresholdState.CollectableCount.ToString());
+            M3Widgets.RowValue("携带的收藏品", thresholdState.CollectableCount.ToString());
             M3Widgets.RowValue("Inventory", $"{thresholdState.UsedSlots} / {thresholdState.TotalSlots}");
         }
 
@@ -333,21 +333,21 @@ public sealed class CollectablesWindow : M3PanelWindow
         if (selectedGatheringList == null)
         {
             ImGui.Dummy(new Vector2(0f, M3.Space1));
-            M3Widgets.Banner("##collectables_no_gathering_list", "Select a gathering purchase list for Auto-Gather and gathering manual turn-ins.",
+            M3Widgets.Banner("##collectables_no_gathering_list", "为自动采集及手动交付采集收藏品选择购买清单。",
                 M3Severity.Warning, FontAwesomeIcon.ExclamationTriangle);
         }
 
         if (selectedCraftingList == null)
         {
             ImGui.Dummy(new Vector2(0f, M3.Space1));
-            M3Widgets.Banner("##collectables_no_crafting_list", "Select a crafting purchase list for Vulcan and crafting manual turn-ins.",
+            M3Widgets.Banner("##collectables_no_crafting_list", "为 Vulcan 及手动交付制作收藏品选择购买清单。",
                 M3Severity.Warning, FontAwesomeIcon.ExclamationTriangle);
         }
     }
 
     private static void DrawSetupGuide()
     {
-        using var dialog = M3Dialog.Begin(SetupGuideDialogId, "Collectables setup guide",
+        using var dialog = M3Dialog.Begin(SetupGuideDialogId, "收藏品设置指南",
             "Build the scrip purchase list in Vulcan's Vendors page, then assign it here so collectables runs know what to buy after turn-ins.",
             FontAwesomeIcon.QuestionCircle, 600f);
         if (!dialog.IsOpen)
@@ -372,7 +372,7 @@ public sealed class CollectablesWindow : M3PanelWindow
 
         ImGui.Dummy(new Vector2(0f, M3.Space1));
         M3Widgets.Banner("##collectables_guide_plugins",
-            "If turn-ins or purchase automation are unavailable, install or enable Allagan Tools or Allagan Item Search first.", M3Severity.Info,
+            "如果无法自动交付或购买，请先安装或启用 Allagan Tools 或 Allagan Item Search。", M3Severity.Info,
             FontAwesomeIcon.InfoCircle);
 
         var pressed = M3Dialog.Actions(

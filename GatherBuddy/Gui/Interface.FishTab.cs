@@ -43,21 +43,21 @@ public partial class Interface
             if (_globalScale != ImGuiHelpers.GlobalScale)
             {
                 _globalScale = ImGuiHelpers.GlobalScale;
-                _caughtColumnWidth = TextWidth(_caughtColumn.Label) / Scale + Table.ArrowWidth;
+                _caughtColumnWidth = TextWidth(_caughtColumn.DisplayLabel) / Scale + Table.ArrowWidth;
                 _nameColumnWidth = (MaxTextWidth(Items, static i => i.Data.Name[GatherBuddy.Language]) + ItemSpacing.X + LineIconSize.X) / Scale;
                 _nextUptimeColumnWidth = Math.Max(TextWidth("99:99 Minutes") / Scale,
-                    TextWidth(_nextUptimeColumn.Label) / Scale + Table.ArrowWidth);
+                    TextWidth(_nextUptimeColumn.DisplayLabel) / Scale + Table.ArrowWidth);
                 _uptimeColumnWidth = TextWidth("999.9%") / Scale;
                 _baitColumnWidth = (MaxTextWidth(Items, static f => f.Bait[0].Name) + ItemSpacing.X + LineIconSize.X) / Scale;
                 _closestAetheryteColumnWidth = MaxTextWidth(GatherBuddy.GameData.Aetherytes.Values, static a => a.Name) / Scale;
                 _typeColumnWidth = TextWidth("Spearfishing") / Scale;
-                _collectibleColumnWidth = TextWidth(_collectibleColumn.Label) / Scale + Table.ArrowWidth;
-                _patchColumnWidth = TextWidth(_patchColumn.Label) / Scale + Table.ArrowWidth;
+                _collectibleColumnWidth = TextWidth(_collectibleColumn.DisplayLabel) / Scale + Table.ArrowWidth;
+                _patchColumnWidth = TextWidth(_patchColumn.DisplayLabel) / Scale + Table.ArrowWidth;
                 _folkloreColumnWidth = MaxTextWidth(Items, static i => i.Data.Folklore) / Scale;
                 _bestSpotColumnWidth = MaxTextWidth(GatherBuddy.GameData.FishingSpots.Values, static a => a.Name) / Scale;
                 _bestZoneColumnWidth = MaxTextWidth(GatherBuddy.GameData.Territories.Values, static a => a.Name) / Scale;
-                _itemIdColumnWidth = Math.Max(TextWidth("999999") / Scale, TextWidth(_itemIdColumn.Label) / Scale + Table.ArrowWidth);
-                _fishIdColumnWidth = Math.Max(TextWidth("99999") / Scale, TextWidth(_fishIdColumn.Label) / Scale + Table.ArrowWidth);
+                _itemIdColumnWidth = Math.Max(TextWidth("999999") / Scale, TextWidth(_itemIdColumn.DisplayLabel) / Scale + Table.ArrowWidth);
+                _fishIdColumnWidth = Math.Max(TextWidth("99999") / Scale, TextWidth(_fishIdColumn.DisplayLabel) / Scale + Table.ArrowWidth);
             }
 
             GatherBuddy.FishLog.CheckForChanges();
@@ -76,20 +76,20 @@ public partial class Interface
             GatherBuddy.FishLog.Change += OnLogChange;
         }
 
-        private static readonly NameColumn _nameColumn = new() { Label = "Filter fish" };
-        private static readonly CaughtColumn _caughtColumn = new() { Label = "Log" };
-        private static readonly NextUptimeColumn _nextUptimeColumn = new() { Label = "Next Uptime" };
-        private static readonly UptimesColumn _uptimeColumn = new() { Label = "Up%" };
-        private static readonly BaitColumn _baitColumn = new() { Label = "Bait" };
-        private static readonly AetheryteColumn _aetheryteColumn = new() { Label = "Aetheryte" };
-        private static readonly TypeColumn _typeColumn = new() { Label = "Fish Type" };
-        private static readonly CollectibleColumn _collectibleColumn = new() { Label = "Coll." };
-        private static readonly PatchColumn _patchColumn = new() { Label = "Patch" };
-        private static readonly FolkloreColumn _folkloreColumn = new() { Label = "Folklore" };
-        private static readonly BestSpotColumn _bestSpotColumn = new() { Label = "Best Spot" };
-        private static readonly BestZoneColumn _bestZoneColumn = new() { Label = "Best Zone" };
-        private static readonly ItemIdColumn _itemIdColumn = new() { Label = "Item Id" };
-        private static readonly FishIdColumn _fishIdColumn = new() { Label = "G. Id" };
+        private static readonly NameColumn _nameColumn = new() { Label = "Filter fish", LocalizedLabel = "物品名称..." };
+        private static readonly CaughtColumn _caughtColumn = new() { Label = "Log", LocalizedLabel = "已记录" };
+        private static readonly NextUptimeColumn _nextUptimeColumn = new() { Label = "Next Uptime", LocalizedLabel = "下次窗口期" };
+        private static readonly UptimesColumn _uptimeColumn = new() { Label = "Up%", LocalizedLabel = "概率%" };
+        private static readonly BaitColumn _baitColumn = new() { Label = "Bait", LocalizedLabel = "钓饵..." };
+        private static readonly AetheryteColumn _aetheryteColumn = new() { Label = "Aetheryte", LocalizedLabel = "以太之光..." };
+        private static readonly TypeColumn _typeColumn = new() { Label = "Fish Type", LocalizedLabel = "鱼类型" };
+        private static readonly CollectibleColumn _collectibleColumn = new() { Label = "Coll.", LocalizedLabel = "收藏品" };
+        private static readonly PatchColumn _patchColumn = new() { Label = "Patch", LocalizedLabel = "版本" };
+        private static readonly FolkloreColumn _folkloreColumn = new() { Label = "Folklore", LocalizedLabel = "传承录..." };
+        private static readonly BestSpotColumn _bestSpotColumn = new() { Label = "Best Spot", LocalizedLabel = "最佳钓场..." };
+        private static readonly BestZoneColumn _bestZoneColumn = new() { Label = "Best Zone", LocalizedLabel = "最佳区域..." };
+        private static readonly ItemIdColumn _itemIdColumn = new() { Label = "Item Id", LocalizedLabel = "物品 ID" };
+        private static readonly FishIdColumn _fishIdColumn = new() { Label = "G. Id", LocalizedLabel = "采集品 ID" };
 
         private class FishFilterColumn : ColumnFlags<FishFilter, ExtendedFish>
         {

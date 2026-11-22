@@ -140,8 +140,8 @@ public partial class Interface
         public readonly GatherGroupSelector Selector = new(gatherGroupManager);
 
         public readonly string DefaultGroupTooltip =
-                "Restore the gather groups provided by default if they have been deleted or changed in any way.\n"
-              + "Hold Control to apply. Default Groups are:\n\t- "
+                "恢复被删除或修改的默认采集组。\n"
+              + "按住 Ctrl 应用。默认采集组：\n\t- "
               + $"{string.Join("\n\t- ", GroupData.DefaultGroups.ConvertAll(g => g.Name))}";
         public int NewItemIdx = 0;
 
@@ -187,9 +187,10 @@ public partial class Interface
 
     private static bool DrawGatherableCombo(string id, ref int index, float width)
         => M3Widgets.Combo(id, ref index, GatherGroupCache.AllGatherables.Length, i => GatherGroupCache.AllGatherables[i].Name[GatherBuddy.Language],
-            width, "Choose an item", true);
+            width, "选择物品", true);
 
     private static readonly string[] GatherGroupColumns = ["##delete", "Item", "Eorzea time", "Location", "Length", "Annotation"];
+    private static readonly string[] GatherGroupColumnLabels = ["", "物品", "艾欧泽亚时间", "地点", "时长", "备注"];
 
     private static void DrawTimeInput(string label, float width, int value, Action<int> setter)
     {
@@ -224,7 +225,7 @@ public partial class Interface
         ImGui.AlignTextToFramePadding();
         using (M3Text.Push(M3TextStyle.Muted))
         {
-            ImGui.TextUnformatted("from");
+            ImGui.TextUnformatted("从");
         }
 
         ImGui.SameLine();
@@ -232,7 +233,7 @@ public partial class Interface
         ImGui.SameLine();
         using (M3Text.Push(M3TextStyle.Muted))
         {
-            ImGui.TextUnformatted("to");
+            ImGui.TextUnformatted("到");
         }
 
         ImGui.SameLine();
@@ -265,7 +266,7 @@ public partial class Interface
         ImGui.TableNextRow();
         ImGui.TableNextColumn();
         Ui.CenterInRow(rowHeight, ImGui.GetFrameHeight());
-        if (M3Widgets.IconButton("##delete", FontAwesomeIcon.Trash, "Remove this item", diameter: ImGui.GetFrameHeight()))
+        if (M3Widgets.IconButton("##delete", FontAwesomeIcon.Trash, "移除此物品", diameter: ImGui.GetFrameHeight()))
         {
             if (GatherGroupManager.ChangeGroupNode(group, i, null, null, null, null, true))
             {
@@ -309,16 +310,16 @@ public partial class Interface
         var length = node.Length();
         if (minutes < length)
         {
-            Ui.Framed($"{length} minutes", ColorId.WarningBg.Value());
-            HoverTooltip($"{length - minutes} minutes are overwritten by overlap with earlier items.");
+            Ui.Framed($"{length} 分钟", ColorId.WarningBg.Value());
+            HoverTooltip($"与排在前面的物品重叠的 {length - minutes} 分钟不会生效。");
         }
         else
         {
-            Ui.Framed($"{length} minutes", M3.Scheme.SurfaceContainerHighest);
+            Ui.Framed($"{length} 分钟", M3.Scheme.SurfaceContainerHighest);
         }
 
         ImGui.TableNextColumn();
-        if (Ui.CommitField("##annotation", "Annotation", node.Annotation, out var annotation, 250 * M3.Scale)
+        if (Ui.CommitField("##annotation", "备注", node.Annotation, out var annotation, 250 * M3.Scale)
          && GatherGroupManager.ChangeGroupNode(group, i, null, null, null, annotation, false))
         {
             _plugin.GatherGroupManager.Save();
@@ -330,7 +331,7 @@ public partial class Interface
         var times = _gatherGroupCache.UpdateItemPerMinute(group);
         if (times[0] > 0)
         {
-            M3Widgets.Banner("##missingTimes", "Not all minutes have an item.", M3Severity.Warning, FontAwesomeIcon.ExclamationTriangle);
+            M3Widgets.Banner("##missingTimes", "有些时段未安排采集物品。", M3Severity.Warning, FontAwesomeIcon.ExclamationTriangle);
         }
 
         using var style = M3Table.PushStyle();
@@ -347,12 +348,12 @@ public partial class Interface
         }
 
         ImGui.TableNextRow(ImGuiTableRowFlags.Headers);
-        foreach (var column in GatherGroupColumns)
+        for (var i = 0; i < GatherGroupColumns.Length; i++)
         {
             ImGui.TableNextColumn();
-            if (!column.StartsWith("##"))
+            if (!GatherGroupColumns[i].StartsWith("##"))
             {
-                M3Table.Header(column, center: false);
+                M3Table.Header(GatherGroupColumnLabels[i], center: false);
             }
         }
 
@@ -365,7 +366,7 @@ public partial class Interface
         ImGui.TableNextRow();
         ImGui.TableNextColumn();
         Ui.CenterInRow(M3Widgets.ComboHeight, ImGui.GetFrameHeight());
-        if (M3Widgets.IconButton("##add", FontAwesomeIcon.Plus, "Add this item", M3ButtonStyle.Tonal, diameter: ImGui.GetFrameHeight()))
+        if (M3Widgets.IconButton("##add", FontAwesomeIcon.Plus, "添加此物品", M3ButtonStyle.Tonal, diameter: ImGui.GetFrameHeight()))
         {
             var gatherable = GatherGroupCache.AllGatherables[idx];
             if (gatherable.InternalLocationId > 0)
@@ -403,7 +404,7 @@ public partial class Interface
 
     private static void DrawNameField(TimedGroup group)
     {
-        if (!Ui.CommitField("##groupName", "Name", group.Name, out var newName, SetInputWidth, 64))
+        if (!Ui.CommitField("##groupName", "名称", group.Name, out var newName, SetInputWidth, 64))
         {
             return;
         }
@@ -411,11 +412,11 @@ public partial class Interface
         newName = newName.Trim();
         if (newName.Length == 0)
         {
-            M3Snackbar.Show("A gather group needs a name.", severity: M3Severity.Error);
+            M3Snackbar.Show("采集组必须有名称。", severity: M3Severity.Error);
         }
         else if (newName != group.Name && _plugin.GatherGroupManager.Groups.ContainsKey(newName.ToLowerInvariant()))
         {
-            M3Snackbar.Show($"There already is a gather group named {newName}.", severity: M3Severity.Error);
+            M3Snackbar.Show($"已存在名为 {newName} 的采集组。", severity: M3Severity.Error);
         }
         else if (_plugin.GatherGroupManager.RenameGroup(group, newName))
         {
@@ -425,7 +426,7 @@ public partial class Interface
 
     private static void DrawDescField(TimedGroup group)
     {
-        if (Ui.CommitField("##groupDesc", "Description", group.Description, out var newDesc, 2 * SetInputWidth, 128)
+        if (Ui.CommitField("##groupDesc", "描述", group.Description, out var newDesc, 2 * SetInputWidth, 128)
          && GatherGroupManager.ChangeDescription(group, newDesc))
         {
             _plugin.GatherGroupManager.Save();
@@ -448,57 +449,57 @@ public partial class Interface
         var current = _gatherGroupCache.Selector.Current;
         var row = new Ui.Row(M3Widgets.ButtonHeight);
         row.Place(M3Widgets.IconButtonSize);
-        if (M3Widgets.IconButton("##copy", FontAwesomeIcon.Copy, "Copy this gather group to your clipboard", enabled: current != null))
+        if (M3Widgets.IconButton("##copy", FontAwesomeIcon.Copy, "将此采集组复制到剪贴板", enabled: current != null))
         {
             try
             {
                 ImGui.SetClipboardText(current!.ToConfig().ToBase64());
-                Communicator.PrintClipboardMessage("Gather Group ", current.Name);
+                Communicator.PrintClipboardMessage("采集组 ", current.Name);
             }
             catch (Exception e)
             {
-                Communicator.PrintClipboardMessage("Gather Group ", current!.Name, e);
+                Communicator.PrintClipboardMessage("采集组 ", current!.Name, e);
             }
         }
 
         row.Next(M3Widgets.ButtonHeight, M3.Space1);
-        if (M3Widgets.Button("##list", "Make auto-gather list", M3ButtonStyle.Text, FontAwesomeIcon.Robot, enabled: current != null,
-                tooltip: "Create a new auto-gather list from this gather group."))
+        if (M3Widgets.Button("##list", "创建自动采集列表", M3ButtonStyle.Text, FontAwesomeIcon.Robot, enabled: current != null,
+                tooltip: "根据此采集组创建新的自动采集列表。"))
         {
             _plugin.AutoGatherListsManager.AddList(new AutoGatherList(current!));
-            M3Snackbar.Show("Created an auto-gather list.");
+            M3Snackbar.Show("已创建自动采集列表。");
         }
 
         row.Next(M3Widgets.ButtonHeight, M3.Space1);
-        if (M3Widgets.Button("##preset", "Make window preset", M3ButtonStyle.Text, FontAwesomeIcon.ListUl, enabled: current != null,
-                tooltip: "Create a new gather window preset from this gather group."))
+        if (M3Widgets.Button("##preset", "创建窗口预设", M3ButtonStyle.Text, FontAwesomeIcon.ListUl, enabled: current != null,
+                tooltip: "根据此采集组创建新的采集窗口预设。"))
         {
             _plugin.GatherWindowManager.AddPreset(new GatherWindowPreset(current!));
-            M3Snackbar.Show("Created a gather window preset.");
+            M3Snackbar.Show("已创建采集窗口预设。");
         }
 
         row.Next(M3Widgets.ButtonHeight, M3.Space1);
-        if (M3Widgets.Button("##alarms", "Make alarms", M3ButtonStyle.Text, FontAwesomeIcon.Bell, enabled: current != null,
-                tooltip: "Create a new alarm group from this gather group."))
+        if (M3Widgets.Button("##alarms", "创建闹钟", M3ButtonStyle.Text, FontAwesomeIcon.Bell, enabled: current != null,
+                tooltip: "根据此采集组创建新的闹钟组。"))
         {
             _plugin.AlarmManager.AddGroup(new AlarmGroup(current!));
-            M3Snackbar.Show("Created an alarm group.");
+            M3Snackbar.Show("已创建闹钟组。");
         }
 
         row.Next(M3Widgets.ButtonHeight, M3.Space1);
-        if (M3Widgets.HoldButton("##restore", "Restore default groups", 1f, M3ButtonStyle.Tonal, FontAwesomeIcon.Undo,
-                tooltip: $"{_gatherGroupCache.DefaultGroupTooltip.Replace("Hold Control to apply.", "Press and hold to apply.")}")
+        if (M3Widgets.HoldButton("##restore", "恢复默认采集组", 1f, M3ButtonStyle.Tonal, FontAwesomeIcon.Undo,
+                tooltip: $"{_gatherGroupCache.DefaultGroupTooltip.Replace("按住 Ctrl 应用。", "长按以应用。")}")
          && _plugin.GatherGroupManager.SetDefaults(true))
         {
             _gatherGroupCache.Selector.TryRestoreCurrent();
             _plugin.GatherGroupManager.Save();
-            M3Snackbar.Show("Restored the default gather groups.");
+            M3Snackbar.Show("已恢复默认采集组。");
         }
 
         row.Next(ImGui.GetFrameHeight(), M3.Space2);
-        M3Widgets.HelpMarker("Use /gathergroup [name] [optional:minute offset] to call a group.\n"
-          + "This will /gather the item that is up currently (or [minute offset] eorzea minutes in the future).\n"
-          + "If times for multiple items overlap, the first item from top to bottom will be gathered.");
+        M3Widgets.HelpMarker("使用 /gathergroup [组名] [可选：偏移分钟数] 调用采集组。\n"
+          + "使用 /gather 采集当前时段（或指定艾欧泽亚分钟后）可采集的物品。\n"
+          + "若多个物品的时段重叠，优先采集列表中排在最前面的物品。");
     }
 
     private void DrawGatherGroupPage()
@@ -515,7 +516,7 @@ public partial class Interface
             }
             else
             {
-                M3Widgets.EmptyState("##noGroup", "No gather group selected", "Add a group with the plus button below the list.", FontAwesomeIcon.LayerGroup);
+                M3Widgets.EmptyState("##noGroup", "未选择采集组", "点击列表下方的加号添加组。", FontAwesomeIcon.LayerGroup);
             }
         });
     }

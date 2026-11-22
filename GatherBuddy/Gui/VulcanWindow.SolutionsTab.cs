@@ -36,7 +36,7 @@ public partial class VulcanWindow
         var coordinator = GatherBuddy.RaphaelSolveCoordinator;
         var raphaelConfig = GatherBuddy.Config.RaphaelSolverConfig;
 
-        M3Widgets.SearchField("##solutionsSearch", "Search items", ref _solutionsSearch, VulcanUiScaling.Scaled(240f));
+        M3Widgets.SearchField("##solutionsSearch", "搜索物品", ref _solutionsSearch, VulcanUiScaling.Scaled(240f));
         var rowTop = ImGui.GetItemRectMin().Y;
         var rowHeight = ImGui.GetItemRectSize().Y;
 
@@ -47,15 +47,15 @@ public partial class VulcanWindow
         }
 
         SameRow(M3Widgets.ButtonHeight, M3.Space2);
-        if (M3Widgets.Button("##stopQueue", "Stop queue", M3ButtonStyle.Tonal, FontAwesomeIcon.Stop, enabled: coordinator.PendingSolves > 0,
-                tooltip: "Cancel queued and active Raphael solves while keeping completed cached solutions."))
+        if (M3Widgets.Button("##stopQueue", "停止队列", M3ButtonStyle.Tonal, FontAwesomeIcon.Stop, enabled: coordinator.PendingSolves > 0,
+                tooltip: "取消等待中及进行中的 Raphael 求解，保留已完成的缓存方案。"))
         {
             coordinator.CancelAllPendingSolves();
         }
 
         SameRow(M3Widgets.ButtonHeight, M3.Space2);
-        if (M3Widgets.Button("##clearAll", "Clear all", M3ButtonStyle.Text, FontAwesomeIcon.Trash, enabled: _solutionsList.Count > 0,
-                tooltip: "Forget every cached solution."))
+        if (M3Widgets.Button("##clearAll", "全部清空", M3ButtonStyle.Text, FontAwesomeIcon.Trash, enabled: _solutionsList.Count > 0,
+                tooltip: "清除所有缓存方案。"))
         {
             coordinator.Clear();
             _selectedSolutionKey = null;
@@ -64,7 +64,7 @@ public partial class VulcanWindow
 
         SameRow(Ui.LabeledCheckboxHeight, M3.Space2);
         var autoClear = raphaelConfig.AutoClearSolutionCache;
-        if (M3Widgets.LabeledCheckbox("Clear when a queue starts", ref autoClear,
+        if (M3Widgets.LabeledCheckbox("队列开始时清除###Clear when a queue starts", ref autoClear,
                 tooltip: "Clears cached solutions each time a new crafting queue starts.\nTurn this off to reuse solutions across queue runs when your stats haven't changed."))
         {
             raphaelConfig.AutoClearSolutionCache = autoClear;
@@ -93,10 +93,10 @@ public partial class VulcanWindow
 
         if (filtered.Count == 0)
         {
-            M3Widgets.EmptyState("##noSolutions", _solutionsList.Count == 0 ? "No cached solutions" : "No matches",
+            M3Widgets.EmptyState("##noSolutions", _solutionsList.Count == 0 ? "没有缓存方案" : "没有匹配结果",
                 _solutionsList.Count == 0
-                    ? "Start a queue with the Raphael solver to generate solutions."
-                    : "No solutions match your search.", FontAwesomeIcon.Lightbulb);
+                    ? "使用 Raphael 求解器启动制作队列以生成方案。"
+                    : "没有符合搜索条件的方案。", FontAwesomeIcon.Lightbulb);
             return;
         }
 
@@ -137,7 +137,7 @@ public partial class VulcanWindow
     {
         if (_selectedSolutionKey == null)
         {
-            M3Widgets.EmptyState("##noSolution", "No solution selected", "Pick a solution on the left to see its steps.", FontAwesomeIcon.Lightbulb);
+            M3Widgets.EmptyState("##noSolution", "未选择方案", "在左侧选择方案查看制作步骤。", FontAwesomeIcon.Lightbulb);
             return;
         }
 
@@ -170,7 +170,7 @@ public partial class VulcanWindow
         }
 
         ImGui.Dummy(new Vector2(0, M3.Space2));
-        using (M3Card.Begin("##solveParameters", "Solve parameters", FontAwesomeIcon.SlidersH, M3.AccentFor(0)))
+        using (M3Card.Begin("##solveParameters", "求解参数", FontAwesomeIcon.SlidersH, M3.AccentFor(0)))
         {
             M3Widgets.RowValue("Level", req.Level.ToString());
             M3Widgets.RowValue("Craftsmanship", req.Craftsmanship.ToString());
