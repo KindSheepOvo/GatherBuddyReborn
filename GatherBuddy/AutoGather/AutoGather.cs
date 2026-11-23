@@ -57,6 +57,7 @@ namespace GatherBuddy.AutoGather
             ArtisanExporter = new Reflection.ArtisanExporter(plugin.AutoGatherListsManager);
             Dalamud.Chat.CheckMessageHandled += OnMessageHandled;
             Dalamud.ToastGui.QuestToast += OnQuestToast;
+            Dalamud.ToastGui.ErrorToast += OnFlightErrorToast;
             //Dalamud.AddonLifecycle.RegisterListener(AddonEvent.PreFinalize, "Gathering", OnGatheringFinalize);
             _plugin.FishRecorder.Parser.CaughtFish += OnFishCaught;
         }
@@ -185,10 +186,32 @@ namespace GatherBuddy.AutoGather
             }
         }
 
+        private void OnFlightErrorToast(ref SeString message, ref bool isHandled)
+            => LogFlightError(message);
+
+        private void LogFlightError(SeString message)
+        {
+            if (!Enabled || !Dalamud.Conditions[ConditionFlag.InFlight] || !Throttler.Throttle("GBR.FlightError", 1000))
+            {
+                return;
+            }
+
+            var now = Environment.TickCount64;
+            var recentAction = _lastTravelAction is { } action && now - action.Time <= 5000
+                ? $"{action.Type} {action.Id}（{now - action.Time} 毫秒前）"
+                : "最近 5 秒无坐骑、采集增益或消耗品动作";
+            GatherBuddy.Log.Information($"[飞行提示] {message.TextValue}，GBR 最近动作={recentAction}，角色={Player.Position}，导航目标={CurrentDestination}，计划落点={(_navState.groundWaypointCount > 0 ? _navState.landingPoint : (Vector3?)null)}");
+        }
+
         private void OnMessageHandled(IHandleableChatMessage chatMessage)
         {
             try
             {
+                if (chatMessage.LogKind == XivChatType.ErrorMessage)
+                {
+                    LogFlightError(chatMessage.Message);
+                }
+
                 if (chatMessage.LogKind is (XivChatType)2243)
                 {
                     var text = chatMessage.Message.TextValue;
@@ -428,6 +451,8 @@ namespace GatherBuddy.AutoGather
                     _fishingSpotArrivalTime.Clear();
                     ResetFishingApproachState();
                     ResetPendingFishingTargetChange();
+                    _lastTravelAction = null;
+                    _failedPath = null;
                     Dalamud.ToastGui.ErrorToast -= HandleNodeInteractionErrorToast;
 
                     M3Gamepad.EnableInputBlocking();
@@ -553,6 +578,8 @@ namespace GatherBuddy.AutoGather
             var currentTerritory = Dalamud.ClientState.TerritoryType;
             if (_lastTerritory != currentTerritory)
             {
+                _lastTravelAction = null;
+                _failedPath = null;
                 if (CurrentDestination != default)
                 {
                     StopNavigation();
@@ -671,6 +698,8 @@ namespace GatherBuddy.AutoGather
             }
 
             HandlePathfinding(); // This should be done before checking TaskManager
+            if (_navState.landing != null)
+                return;
 
             if (Dalamud.Conditions[ConditionFlag.Jumping61] && IsPathing) // Jumping Windmire
             {
@@ -2198,7 +2227,7 @@ namespace GatherBuddy.AutoGather
                     var pos = nextNode.Position;
                     if (TryWindmireJump(ref pos))
                     {
-                        Navigate(pos, ShouldFly(pos), direct: true, nodeId: nextNode.BaseId);
+                        Navigate(pos, ShouldFly(pos), direct: true);
                     }
                     else
                     {
@@ -2463,7 +2492,7 @@ namespace GatherBuddy.AutoGather
 
             var jump = Diadem.IsInside && TryWindmireJump(ref selectedFarNode.Position);
 
-            Navigate(selectedFarNode.Position, ShouldFly(selectedFarNode.Position), direct: jump, nodeId: jump ? null : selectedFarNode.Id);
+            Navigate(selectedFarNode.Position, ShouldFly(selectedFarNode.Position), direct: jump, nodeId: jump ? null : selectedFarNode.Id, underwaterNode: isSpearfishing);
             _navState.farNodeLocation = next.Location;
             _navState.farNodeMarker = mapMarker;
         }
@@ -3153,6 +3182,7 @@ namespace GatherBuddy.AutoGather
             _diadem?.Dispose();
             Dalamud.Chat.CheckMessageHandled -= OnMessageHandled;
             Dalamud.ToastGui.QuestToast -= OnQuestToast;
+            Dalamud.ToastGui.ErrorToast -= OnFlightErrorToast;
             //Dalamud.AddonLifecycle.UnregisterListener(AddonEvent.PreFinalize, "Gathering", OnGatheringFinalize);
         }
     }
