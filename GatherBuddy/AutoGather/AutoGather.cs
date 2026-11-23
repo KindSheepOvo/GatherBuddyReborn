@@ -116,6 +116,7 @@ namespace GatherBuddy.AutoGather
         private Vector3 _fishingApproachPosition;
         private readonly List<Vector3> _failedFishingApproachPositions = [];
         private readonly NavigationProgress _fishingApproachProgress = new();
+        private readonly WaypointProgress _waypointProgress = new();
         private int _fishingApproachRetryCount;
         private bool _fishingApproachPathObserved;
         private bool _fishingApproachRecoveryPending;
@@ -552,6 +553,11 @@ namespace GatherBuddy.AutoGather
             var currentTerritory = Dalamud.ClientState.TerritoryType;
             if (_lastTerritory != currentTerritory)
             {
+                if (CurrentDestination != default)
+                {
+                    StopNavigation();
+                }
+
                 ResetFishingApproachState();
                 _lastTerritory = currentTerritory;
                 _diademPathIndex = -1;
@@ -896,6 +902,9 @@ namespace GatherBuddy.AutoGather
                 AutoStatus = $"尝试进一步脱离卡死";
                 return;
             }
+
+            if (CheckActiveWaypoint(isPathing, isPathGenerating))
+                return;
 
             if (isPathGenerating)
             {
@@ -2372,6 +2381,18 @@ namespace GatherBuddy.AutoGather
 
             AutoStatus = "正在移动至较远采集点...";
 
+            // Only Legendary, Unspoiled, and Clouded nodes show a map marker.
+            var mapMarkerAvailable = next.Node?.NodeType is NodeType.Legendary or NodeType.Unspoiled or NodeType.Clouded;
+            // Wait an additional 8 seconds because it takes a few seconds for the previous flag to disappear.
+            var gracePeriod = next.Time == TimeInterval.Always ? 0 : next.Time.Start - GatherBuddy.Time.ServerTime.AddSeconds(-8);
+            var mapMarker = mapMarkerAvailable && gracePeriod <= 0 ? TimedNodePosition : null;
+
+            if (CurrentDestination != default
+                && (_navState.farNodeLocation != next.Location || _navState.farNodeMarker != mapMarker))
+            {
+                StopNavigation();
+            }
+
             if (CurrentDestination != default && IsPathing)
             {
                 var currentNode = visibleNodes.Find(o => o.Position == CurrentDestination);
@@ -2403,12 +2424,6 @@ namespace GatherBuddy.AutoGather
 
             (uint? Id, Vector3 Position) selectedFarNode;
 
-            // Only Legendary, Unspoiled, and Clouded nodes show a map marker.
-            var mapMarkerAvailable = next.Node?.NodeType is NodeType.Legendary or NodeType.Unspoiled or NodeType.Clouded;
-            // Wait an additional 8 seconds because it takes a few seconds for the previous flag to disappear.
-            var gracePeriod = next.Time == TimeInterval.Always ? 0 : next.Time.Start - GatherBuddy.Time.ServerTime.AddSeconds(-8);
-            var mapMarker = mapMarkerAvailable && gracePeriod <= 0 ? TimedNodePosition : null;
-
             if (mapMarkerAvailable && ShouldUseFlag)
             {
                 if (mapMarker == null)
@@ -2422,7 +2437,15 @@ namespace GatherBuddy.AutoGather
                 if (selectedFarNode.Position == default || Vector2.DistanceSquared(mapMarker.Value, selectedFarNode.Position.ToVector2()) > 10 * 10)
                 {
                     var point = new Vector3(mapMarker.Value.X, 0, mapMarker.Value.Y);
-                    selectedFarNode = (null, VNavmesh.Query.Mesh.NearestPoint(point, 10, 10000).GetValueOrDefault(point));
+                    var meshPoint = VNavmesh.Query.Mesh.NearestPoint(point, 10, 10000);
+                    if (!meshPoint.HasValue)
+                    {
+                        StopNavigation();
+                        AutoStatus = "等待地图标记附近的可导航位置";
+                        return;
+                    }
+
+                    selectedFarNode = (null, meshPoint.Value);
                 }
             }
             else
@@ -2441,6 +2464,8 @@ namespace GatherBuddy.AutoGather
             var jump = Diadem.IsInside && TryWindmireJump(ref selectedFarNode.Position);
 
             Navigate(selectedFarNode.Position, ShouldFly(selectedFarNode.Position), direct: jump, nodeId: jump ? null : selectedFarNode.Id);
+            _navState.farNodeLocation = next.Location;
+            _navState.farNodeMarker = mapMarker;
         }
 
         private uint LastVisitedNode

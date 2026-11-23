@@ -53,7 +53,11 @@ namespace GatherBuddy.AutoGather
             RetryCombinedPathfinding = 2,
             Done = 3
         }
-        private (Task<List<Vector3>>? task, CancellationTokenSource? cts, Vector3 destination, Vector3 pathDestination, bool retriedDirect, bool flying, bool mountingUp, bool direct, bool offset, PathfindingStage stage, long lastTry, int landWP) _navState;
+        private sealed record NavigationPath(List<Vector3> Waypoints, int GroundWaypointCount = 0);
+
+        private (Task<NavigationPath?>? task, CancellationTokenSource? cts, Vector3 destination, Vector3 pathDestination,
+            bool retriedDirect, bool flying, bool mountingUp, bool direct, bool offset, PathfindingStage stage,
+            long lastTry, int groundWaypointCount, Vector3 retryStart, ILocation? farNodeLocation, Vector2? farNodeMarker) _navState;
         public Vector3 CurrentDestination { get { return _navState.destination; } }
 
         public bool LureSuccess { get; private set; } = false;
