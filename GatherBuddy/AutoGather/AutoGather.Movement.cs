@@ -656,10 +656,12 @@ namespace GatherBuddy.AutoGather
             }
 
             GatherBuddy.Log.Debug($"[MoveToTerritory] 传送到 {aetheryte.Name}");
-            EnqueueActionWithDelay(() => Teleporter.Teleport(aetheryte.Id));
-            TaskManager.Enqueue(() => Dalamud.Conditions[ConditionFlag.BetweenAreas]);
-            TaskManager.Enqueue(() => !Dalamud.Conditions[ConditionFlag.BetweenAreas]);
-            TaskManager.DelayNext(1500);
+            TaskManager.Enqueue(() => Teleporter.Teleport(aetheryte.Id) ? true : (bool?)null, $"传送至 {aetheryte.Name}");
+            // A transfer can finish between frames. The aetheryte may also be in a gateway zone.
+            TaskManager.Enqueue(() => Dalamud.ClientState.TerritoryType == aetheryte.Territory.Id
+                                   && CanAct && GenericHelpers.IsScreenReady(),
+                30000, abortOnTimeout: true, name: $"等待抵达 {aetheryte.Name}");
+            TaskManager.DelayNext((int)GatherBuddy.Config.AutoGatherConfig.ExecutionDelay);
 
             return true;
         }
