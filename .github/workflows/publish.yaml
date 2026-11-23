@@ -8,19 +8,16 @@ jobs:
     permissions:
       contents: write
     runs-on: windows-latest
-    env:
-      REPO_NAME: ${{ github.repository }}
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
         with:
           submodules: recursive
 
-      - name: Get Environment Variables
+      - name: Read assembly version from release tag
         run: |
-          $tag = "${{ github.ref }}" -replace 'refs/tags/', ''
-
-          "tag=$tag" | Out-File -Append -FilePath $Env:GITHUB_ENV
+          if ($env:GITHUB_REF_NAME -cnotmatch '^(?:cn-)?(\d+\.\d+\.\d+\.\d+)$') { throw 'Invalid release tag' }
+          "PLUGIN_VERSION=$($Matches[1])" >> $env:GITHUB_ENV
 
       - name: Set up .NET
         uses: actions/setup-dotnet@v5
@@ -44,7 +41,7 @@ jobs:
         run: dotnet restore Gatherbuddy/Gatherbuddy.csproj
 
       - name: Build Plugin
-        run: dotnet build --no-restore -c Release Gatherbuddy/Gatherbuddy.csproj -p:AssemblyVersion=${{ env.tag }} -p:FileVersion=${{ env.tag }} -p:PackageVersion=${{ env.tag }} -p:InformationalVersion=${{ env.tag }} --output .\build
+        run: dotnet build --no-restore -c Release Gatherbuddy/Gatherbuddy.csproj -p:Version=$env:PLUGIN_VERSION -p:AssemblyVersion=$env:PLUGIN_VERSION -p:FileVersion=$env:PLUGIN_VERSION -p:PackageVersion=$env:PLUGIN_VERSION -p:InformationalVersion=$env:PLUGIN_VERSION --output .\build
       - name: Verify compiled mainland references
         shell: pwsh
         run: ./scripts/verify-dalamud-cn.ps1 -OutputDirectory build
@@ -59,6 +56,7 @@ jobs:
             exit 1
           }
           Copy-Item -Path ".\target\release\raphael-cli.exe" -Destination "..\build\raphael-cli.exe" -Force
+          Copy-Item -LiteralPath ./LICENSE -Destination ../build/LICENSE.raphael-rs.txt
           cd ..
           Remove-Item -Recurse -Force raphael-rs-temp
           Write-Host "Successfully built and copied raphael-cli.exe"
@@ -69,12 +67,19 @@ jobs:
           Copy-Item -LiteralPath ./build-configuration/vendor/RebornMaterial/LICENSE -Destination ./build/LICENSE.RebornMaterial-LGPL-3.0.txt
           Copy-Item -LiteralPath ./build-configuration/GPL-3.0.txt -Destination ./build/LICENSE.RebornMaterial-GPL-3.0.txt
           Copy-Item -LiteralPath ./build-configuration/RebornMaterial-NOTICE.txt -Destination ./build/RebornMaterial-NOTICE.txt
+          Copy-Item -LiteralPath ./LICENSE -Destination ./build/LICENSE.GatherBuddyReborn.txt
 
       - name: Zip Plugin
+        if: ${{ !startsWith(github.ref_name, 'cn-') }}
         run: Compress-Archive -Path .\build\* -DestinationPath .\build\GatherbuddyReborn.zip
+
+      - name: Package mainland release for the Dalamud plugin index
+        if: startsWith(github.ref_name, 'cn-')
+        run: ./scripts/package-release-cn.ps1
 
       - name: Publish Plugin
         uses: softprops/action-gh-release@v3
         with:
-          files: ./build/GatherbuddyReborn.zip
+          files: ${{ startsWith(github.ref_name, 'cn-') && './publish/*' || './build/GatherbuddyReborn.zip' }}
+          fail_on_unmatched_files: true
           token: ${{ secrets.GITHUB_TOKEN }}
