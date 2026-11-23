@@ -219,9 +219,19 @@ namespace GatherBuddy.AutoGather
             }
         }
 
+        private static bool NavigationMovementAllowed
+            => !Dalamud.Conditions[ConditionFlag.Mounting] && !Dalamud.Conditions[ConditionFlag.Mounting71]
+            && !Dalamud.Conditions[ConditionFlag.MountOrOrnamentTransition] && VNavmesh.Path.GetMovementAllowed();
+
+        private void ResetNavigationProgress()
+        {
+            _advancedUnstuck.ResetTracking();
+            _fishingApproachProgress.Reset();
+        }
+
         private void StopNavigation()
         {
-            // Reset navigation logic here
+            _fishingApproachPathObserved = false;
             StopPathfinding();
 
             _navState = default;
@@ -233,6 +243,7 @@ namespace GatherBuddy.AutoGather
 
         private void StopPathfinding()
         {
+            ResetNavigationProgress();
             if (_navState.cts != null && _navState.task != null)
             {
                 var cts = _navState.cts;
@@ -293,6 +304,7 @@ namespace GatherBuddy.AutoGather
             var offsettedDestination = GetCorrectedDestination(destination, Player.Position, nodeId);
             _navState = default;
             _navState.destination = destination;
+            _navState.pathDestination = offsettedDestination;
             _navState.flying = shouldFly;
             _navState.mountingUp = shouldFly && !Dalamud.Conditions[ConditionFlag.Mounted] && !Dalamud.Conditions[ConditionFlag.Diving];
             _navState.direct = direct || !shouldFly || landingDistance == 0 || destination != offsettedDestination || Dalamud.Conditions[ConditionFlag.Diving];
@@ -359,14 +371,17 @@ namespace GatherBuddy.AutoGather
 
             try
             {
-                path = _navState.task.Result;
+                path = _navState.task.GetAwaiter().GetResult();
+            }
+            catch (OperationCanceledException)
+            {
+                StopNavigation();
+                return;
             }
             catch (Exception ex)
             {
                 GatherBuddy.Log.Error($"寻路任务抛出异常: {ex.Message}");
-                StopNavigation();
-                _advancedUnstuck.Force();
-                return;
+                path = [];
             }
             _navState.cts.Dispose();
             _navState.task = null;
@@ -376,7 +391,16 @@ namespace GatherBuddy.AutoGather
             {
                 if (_navState.direct || _navState.stage == PathfindingStage.FallbackDirectPathfinding)
                 {
-                    GatherBuddy.Log.Error($"VNavmesh 未能找到路径");
+                    if (!_navState.retriedDirect)
+                    {
+                        _navState.retriedDirect = true;
+                        _navState.cts = new CancellationTokenSource();
+                        _navState.task = VNavmesh.Nav.PathfindCancelable(player, _navState.pathDestination, _navState.flying, _navState.cts.Token);
+                        GatherBuddy.Log.Debug($"直接寻路失败，从当前位置重新计算到 {_navState.pathDestination} 的路径");
+                        return;
+                    }
+
+                    GatherBuddy.Log.Error($"VNavmesh 重试后仍找不到前往 {_navState.pathDestination} 的路径");
                     StopNavigation();
                     _advancedUnstuck.Force();
                 }
@@ -471,7 +495,7 @@ namespace GatherBuddy.AutoGather
             }
 
             var groundPath = await VNavmesh.Nav.PathfindCancelable(point.Value, target, false, token);
-            if (groundPath.Count == 0)
+            if (groundPath.Count < 2)
             {
                 return [];
             }
@@ -525,6 +549,11 @@ namespace GatherBuddy.AutoGather
 
                 // Quadratic coefficients: at^2 + bt + c = 0.
                 var a = Vector2.Dot(d, d);
+                if (a == 0)
+                {
+                    return p1;
+                }
+
                 var b = 2 * Vector2.Dot(f, d);
                 var c = Vector2.Dot(f, f) - radius * radius;
 

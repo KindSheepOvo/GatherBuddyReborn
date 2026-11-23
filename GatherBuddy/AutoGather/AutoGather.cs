@@ -115,9 +115,7 @@ namespace GatherBuddy.AutoGather
         private GatherTarget? _fishingApproachTarget;
         private Vector3 _fishingApproachPosition;
         private readonly List<Vector3> _failedFishingApproachPositions = [];
-        private DateTime _fishingApproachLastProgressTime = DateTime.MinValue;
-        private DateTime _fishingApproachLastCheckTime = DateTime.MinValue;
-        private float _fishingApproachBestDistance = float.MaxValue;
+        private readonly NavigationProgress _fishingApproachProgress = new();
         private int _fishingApproachRetryCount;
         private bool _fishingApproachPathObserved;
         private bool _fishingApproachRecoveryPending;
@@ -245,9 +243,7 @@ namespace GatherBuddy.AutoGather
             _fishingApproachTarget = null;
             _fishingApproachPosition = default;
             _failedFishingApproachPositions.Clear();
-            _fishingApproachLastProgressTime = DateTime.MinValue;
-            _fishingApproachLastCheckTime = DateTime.MinValue;
-            _fishingApproachBestDistance = float.MaxValue;
+            _fishingApproachProgress.Reset();
             _fishingApproachRetryCount = 0;
             _fishingApproachPathObserved = false;
             _fishingApproachRecoveryPending = false;
@@ -271,9 +267,7 @@ namespace GatherBuddy.AutoGather
         {
             EnsureFishingApproachTarget(target);
             _fishingApproachPosition = position;
-            _fishingApproachBestDistance = position.DistanceToPlayer();
-            _fishingApproachLastProgressTime = DateTime.Now;
-            _fishingApproachLastCheckTime = DateTime.MinValue;
+            _fishingApproachProgress.Reset();
             _fishingApproachRetryCount = 0;
             _fishingApproachPathObserved = false;
         }
@@ -292,10 +286,6 @@ namespace GatherBuddy.AutoGather
                     $"[AutoGather] Fishing approach stalled for {target.Fish!.Name[GatherBuddy.Language]} at {target.FishingSpot!.Name}: {reason}; retrying position={position}; {routeState}");
                 StopNavigation();
                 _fishingSpotArrivalTime.Remove(target);
-                _fishingApproachBestDistance = position.DistanceToPlayer();
-                _fishingApproachLastProgressTime = DateTime.Now;
-                _fishingApproachLastCheckTime = DateTime.MinValue;
-                _fishingApproachPathObserved = false;
                 AutoStatus = "钓鱼寻路停滞，正在重试当前钓点...";
                 return;
             }
@@ -314,10 +304,6 @@ namespace GatherBuddy.AutoGather
             _fishingSpotArrivalTime.Remove(target);
             _jiggleAttempts.Remove(target);
             _fishingApproachPosition = default;
-            _fishingApproachBestDistance = float.MaxValue;
-            _fishingApproachLastProgressTime = DateTime.MinValue;
-            _fishingApproachLastCheckTime = DateTime.MinValue;
-            _fishingApproachPathObserved = false;
 
             if (runUnstuck)
             {
@@ -342,55 +328,28 @@ namespace GatherBuddy.AutoGather
                 return true;
             }
 
-            var now = DateTime.Now;
-            if (_fishingApproachLastCheckTime != DateTime.MinValue
-             && (now - _fishingApproachLastCheckTime).TotalSeconds > 1)
+            if (CurrentDestination != destination)
             {
-                _fishingApproachBestDistance = System.Math.Min(_fishingApproachBestDistance, distance);
-                _fishingApproachLastProgressTime = now;
-            }
-            _fishingApproachLastCheckTime = now;
-
-            if (!NavReady
-             || isPathGenerating
-             || TaskManager.IsBusy
-             || _advancedUnstuck.IsRunning
-             || Dalamud.Conditions[ConditionFlag.BetweenAreas]
-             || Dalamud.Conditions[ConditionFlag.BetweenAreas51]
-             || Dalamud.Conditions[ConditionFlag.Mounting]
-             || Dalamud.Conditions[ConditionFlag.Mounting71]
-             || Dalamud.Conditions[ConditionFlag.MountOrOrnamentTransition])
-            {
-                _fishingApproachBestDistance = System.Math.Min(_fishingApproachBestDistance, distance);
-                _fishingApproachLastProgressTime = now;
+                _fishingApproachProgress.Reset();
+                _fishingApproachPathObserved = false;
                 return true;
             }
 
-            if (CurrentDestination != destination)
+            if (!NavReady || isPathGenerating || TaskManager.IsBusy || _advancedUnstuck.IsRunning
+             || Dalamud.Conditions[ConditionFlag.BetweenAreas] || Dalamud.Conditions[ConditionFlag.BetweenAreas51]
+             || !NavigationMovementAllowed)
             {
+                _fishingApproachProgress.Reset();
                 return true;
             }
 
             if (isPathing)
             {
-                if (!_fishingApproachPathObserved)
+                _fishingApproachPathObserved = true;
+                var stationarySeconds = _fishingApproachProgress.Observe(Player.Position, Environment.TickCount64);
+                if (stationarySeconds > GatherBuddy.Config.AutoGatherConfig.NavResetThreshold)
                 {
-                    _fishingApproachPathObserved = true;
-                    _fishingApproachBestDistance = distance;
-                    _fishingApproachLastProgressTime = now;
-                    return true;
-                }
-
-                if (_fishingApproachBestDistance - distance >= 1f)
-                {
-                    _fishingApproachBestDistance = distance;
-                    _fishingApproachLastProgressTime = now;
-                    return true;
-                }
-
-                if ((now - _fishingApproachLastProgressTime).TotalSeconds > GatherBuddy.Config.AutoGatherConfig.NavResetThreshold)
-                {
-                    FailFishingApproach(target, $"no destination progress for {(now - _fishingApproachLastProgressTime).TotalSeconds:F1}s", "Fishing route stalled twice, finding a nearby spot...", true, false);
+                    FailFishingApproach(target, $"stationary for {stationarySeconds:F1}s, {distance:F1}y from destination", "钓鱼寻路连续两次停滞，正在寻找附近钓点...", true, false);
                     return false;
                 }
 
@@ -714,7 +673,7 @@ namespace GatherBuddy.AutoGather
 
             if (TaskManager.IsBusy)
             {
-                //GatherBuddy.Log.Verbose("TaskManager has tasks, skipping DoAutoGather");
+                ResetNavigationProgress();
                 return;
             }
 
@@ -734,6 +693,7 @@ namespace GatherBuddy.AutoGather
 
             if (!CanAct && !_diademQueuingInProgress)
             {
+                ResetNavigationProgress();
                 if (!Dalamud.Conditions[ConditionFlag.ExecutingGatheringAction])
                 {
                     AutoStatus = "当前无法行动";
@@ -929,7 +889,8 @@ namespace GatherBuddy.AutoGather
             var isPathGenerating = IsPathGenerating;
             var isPathing = IsPathing;
 
-            if (_advancedUnstuck.IsRunning || !FishingApproachOwnsRecovery && !_advancedUnstuck.Check(CurrentDestination, isPathing))
+            if (_advancedUnstuck.IsRunning || !FishingApproachOwnsRecovery && !_advancedUnstuck.Check(
+                    CurrentDestination, isPathing && !isPathGenerating && NavigationMovementAllowed))
             {
                 StopNavigation();
                 AutoStatus = $"尝试进一步脱离卡死";
