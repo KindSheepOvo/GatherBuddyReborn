@@ -265,6 +265,7 @@ namespace GatherBuddy.AutoGather
             }
 
             _fishingApproachTarget = null;
+            _fishingCollectablePreparation = default;
             _fishingApproachPosition = default;
             _failedFishingApproachPositions.Clear();
             _fishingApproachProgress.Reset();
@@ -1104,14 +1105,7 @@ namespace GatherBuddy.AutoGather
                                 });
                             }
 
-                            ReduceItems(true, () =>
-                            {
-                                if (GatherBuddy.Config.AutoGatherConfig.UseAutoHook && AutoHook.Enabled)
-                                {
-                                    AutoHook.SetPluginState?.Invoke(true);
-                                    AutoHook.SetAutoStartFishing?.Invoke(true);
-                                }
-                            });
+                            ReduceItems(true);
                         }
                     }
                     else

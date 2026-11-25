@@ -1,4 +1,5 @@
 using FFXIVClientStructs.FFXIV.Client.Game;
+using GatherBuddy.Classes;
 using GatherBuddy.Interfaces;
 using GatherBuddy.Plugin;
 using System;
@@ -31,6 +32,11 @@ public static class GatherableExtensions
     public static unsafe int GetInventoryCount(this IGatherable gatherable)
     {
         var inventory = InventoryManager.Instance();
+        if (IsCollectableFish(gatherable))
+        {
+            return inventory->GetInventoryItemCount(gatherable.ItemId, false, false, false, 1);
+        }
+
         var count = inventory->GetInventoryItemCount(gatherable.ItemId, false, false, false, 0);
 
         if (gatherable.ItemData.IsCollectable)
@@ -47,7 +53,7 @@ public static class GatherableExtensions
     public static int GetTotalCount(this IGatherable gatherable, bool useRetainerInventory)
     {
         var localCount = gatherable.GetInventoryCount();
-        if (!useRetainerInventory || !GatherBuddy.Config.AutoGatherConfig.CheckRetainers || !AllaganTools.Enabled)
+        if (!useRetainerInventory || IsCollectableFish(gatherable) || !GatherBuddy.Config.AutoGatherConfig.CheckRetainers || !AllaganTools.Enabled)
         {
             return localCount;
         }
@@ -67,4 +73,7 @@ public static class GatherableExtensions
             return localCount;
         }
     }
+
+    private static bool IsCollectableFish(IGatherable gatherable)
+        => gatherable is Fish && gatherable.ItemData.IsCollectable;
 }

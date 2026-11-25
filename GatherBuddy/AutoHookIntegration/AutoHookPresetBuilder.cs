@@ -384,7 +384,7 @@ public class AutoHookPresetBuilder
         preset.ExtraCfg.SwapPresetIntuitionGain = true;
         preset.ExtraCfg.PresetToSwapIntuitionGain = targetPresetName;
 
-        ConfigureAutoCasts(preset, [.. predators], gbrPreset);
+        ConfigureAutoCasts(preset, [.. predators], gbrPreset, targetFish.Any(fish => fish.ItemData.IsCollectable));
 
         return preset;
     }
@@ -978,10 +978,10 @@ public class AutoHookPresetBuilder
         };
     }
 
-    private static void ConfigureAutoCasts(AHCustomPresetConfig preset, Fish[] fishList, ConfigPreset? gbrPreset)
+    private static void ConfigureAutoCasts(AHCustomPresetConfig preset, Fish[] fishList, ConfigPreset? gbrPreset, bool requireCollect = false)
     {
         var hasMooches = fishList.Any(f => f.Mooches.Length > 0);
-        var needsCollect = fishList.Any(f => f.ItemData.IsCollectable);
+        var needsCollect = requireCollect || fishList.Any(f => f.ItemData.IsCollectable);
         var canBeReduced = fishList.Any(f => f.ItemData.AetherialReduce != 0);
 
         GatherBuddy.Log.Debug($"[AutoHook] ConfigureAutoCasts: 鱼数量={fishList.Length}, 需要收藏品={needsCollect}");

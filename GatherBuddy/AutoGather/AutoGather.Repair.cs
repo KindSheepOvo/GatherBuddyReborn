@@ -229,14 +229,6 @@ public unsafe partial class AutoGather
             return true;
         }, 3000, "等待修理界面关闭或强制关闭");
         TaskManager.DelayNext(delay);
-        TaskManager.Enqueue(() =>
-        {
-            if (GatherBuddy.Config.AutoGatherConfig.UseAutoHook && AutoHook.Enabled)
-            {
-                AutoHook.SetPluginState?.Invoke(true);
-                AutoHook.SetAutoStartFishing?.Invoke(true);
-            }
-        });
 
         return true;
     }

@@ -234,14 +234,6 @@ namespace GatherBuddy.AutoGather
                 }
 
                 DoMateriaExtraction();
-                TaskManager.Enqueue(() =>
-                {
-                    if (GatherBuddy.Config.AutoGatherConfig.UseAutoHook && AutoHook.Enabled)
-                    {
-                        AutoHook.SetPluginState?.Invoke(true);
-                        AutoHook.SetAutoStartFishing?.Invoke(true);
-                    }
-                });
                 return;
             }
 
@@ -267,14 +259,7 @@ namespace GatherBuddy.AutoGather
                     });
                 }
 
-                ReduceItems(true, () =>
-                {
-                    if (GatherBuddy.Config.AutoGatherConfig.UseAutoHook && AutoHook.Enabled)
-                    {
-                        AutoHook.SetPluginState?.Invoke(true);
-                        AutoHook.SetAutoStartFishing?.Invoke(true);
-                    }
-                });
+                ReduceItems(true);
                 return;
             }
 
@@ -300,32 +285,32 @@ namespace GatherBuddy.AutoGather
                 {
                     case FishingState.None:
                     case FishingState.PoleReady:
-                        HandleReady(target, config);
+                        HandleReady(target);
                         break;
                 }
             }
         }
 
-        private void HandleReady(GatherTarget target, ConfigPreset config)
+        private void HandleReady(GatherTarget target)
         {
             LureSuccess = false;
 
-            SetupAutoHookForFishing(target);
-
-            if (GatherBuddy.Config.AutoGatherConfig.UseAutoHook && AutoHook.Enabled)
+            if (GatherBuddy.Config.AutoGatherConfig.UseAutoHook && AutoHook.Enabled
+                && target.Fish is { } fish && PrepareFishingCollectableMode(fish))
             {
+                SetupAutoHookForFishing(target);
                 var hasSnagStatus = Player.HasStatus(761);
-                var needsSnagging = target.Fish?.Snagging == Snagging.Required;
+                var needsSnagging = fish.Snagging == Snagging.Required;
 
                 if (needsSnagging && !hasSnagStatus)
                 {
-                    GatherBuddy.Log.Debug($"[AutoGather] 为 {target.Fish!.Name[GatherBuddy.Language]} 启用钓组");
+                    GatherBuddy.Log.Debug($"[AutoGather] 为 {fish.Name[GatherBuddy.Language]} 启用钓组");
                     EnqueueActionWithDelay(() => UseAction(Actions.Snagging));
                     return;
                 }
                 else if (!needsSnagging && hasSnagStatus)
                 {
-                    GatherBuddy.Log.Debug($"[AutoGather] 为 {target.Fish!.Name[GatherBuddy.Language]} 禁用钓组");
+                    GatherBuddy.Log.Debug($"[AutoGather] 为 {fish.Name[GatherBuddy.Language]} 禁用钓组");
                     EnqueueActionWithDelay(() => UseAction(Actions.Snagging));
                     return;
                 }

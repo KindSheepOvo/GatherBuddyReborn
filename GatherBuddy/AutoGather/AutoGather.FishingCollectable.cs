@@ -1,5 +1,10 @@
+using FFXIVClientStructs.FFXIV.Client.Game;
 using GatherBuddy.Automation;
+using GatherBuddy.Classes;
+using GatherBuddy.Helpers;
+using GatherBuddy.Plugin;
 using Lumina.Excel.Sheets;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -8,6 +13,8 @@ namespace GatherBuddy.AutoGather
 {
     public partial class AutoGather
     {
+        private (uint ItemId, long Deadline, bool ActionRequested) _fishingCollectablePreparation;
+
         private static readonly List<string> CollectablePatterns =
         [
             "collectability of",
@@ -17,6 +24,45 @@ namespace GatherBuddy.AutoGather
             "Sammlerwert",
             "Valeur de collection"
         ];
+
+        private unsafe bool PrepareFishingCollectableMode(Fish fish)
+        {
+            var action = Actions.CollectorsGlove;
+            if (!fish.ItemData.IsCollectable || Player.HasAnyStatus(action.StatusProvide))
+            {
+                _fishingCollectablePreparation = default;
+                return true;
+            }
+
+            var now = Environment.TickCount64;
+            if (_fishingCollectablePreparation.ItemId != fish.ItemId)
+            {
+                if (AutoHook.GetAutoStartFishing?.Invoke() == true)
+                    AutoHook.SetAutoStartFishing?.Invoke(false);
+                if (AutoHook.GetPluginState?.Invoke() == true)
+                    AutoHook.SetPluginState?.Invoke(false);
+
+                _fishingCollectablePreparation = (fish.ItemId, now + 5000, false);
+            }
+
+            if (now >= _fishingCollectablePreparation.Deadline)
+            {
+                const string message = "无法开启「收藏品采集」。请确认已解锁该技能，并处于可使用技能的状态。";
+                Communicator.PrintError(message);
+                AbortAutoGather(message);
+                return false;
+            }
+
+            AutoStatus = "正在开启收藏品采集...";
+            var actions = ActionManager.Instance();
+            if (!_fishingCollectablePreparation.ActionRequested && actions != null
+                && actions->GetActionStatus(ActionType.Action, action.ActionId) == 0)
+            {
+                _fishingCollectablePreparation.ActionRequested = actions->UseAction(ActionType.Action, action.ActionId);
+            }
+
+            return false;
+        }
 
         private unsafe bool HandleFishingCollectable()
         {
