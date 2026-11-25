@@ -30,11 +30,11 @@ public class CraftingStatusWindow : M3Window
         SizeCondition = ImGuiCond.Appearing;
     }
 
-    public void SetQueueProcessor(CraftingQueueProcessor? processor)
+    public void SetQueueProcessor(CraftingQueueProcessor? processor, bool restoreWindow = true)
     {
         _queueProcessor = processor;
         ResetRemainingEstimateCache();
-        if (processor == null)
+        if (processor == null && CraftingGatherBridge.StockStatus == null)
         {
             IsOpen = false;
             _pendingCollapseState = null;
@@ -42,15 +42,18 @@ public class CraftingStatusWindow : M3Window
             return;
         }
 
-        OpenOrRestore();
+        if (restoreWindow)
+        {
+            OpenOrRestore();
+        }
     }
 
     public bool HasActiveQueue
-        => _queueProcessor != null;
+        => _queueProcessor != null || CraftingGatherBridge.StockStatus != null;
 
     public void OpenOrRestore()
     {
-        if (_queueProcessor == null)
+        if (!HasActiveQueue)
         {
             return;
         }
@@ -62,7 +65,7 @@ public class CraftingStatusWindow : M3Window
 
     public override bool DrawConditions()
     {
-        return _queueProcessor != null && IsOpen;
+        return HasActiveQueue && IsOpen;
     }
 
     protected override void PreDrawThemed()
@@ -87,6 +90,29 @@ public class CraftingStatusWindow : M3Window
 
     public override void Draw()
     {
+        const string stopTooltip = "停止制作队列。";
+        if (CraftingGatherBridge.StockStatus is { } status)
+        {
+            ReportFocus();
+            M3Text.Draw(status, M3TextStyle.Body, true);
+            if (CraftingGatherBridge.StockRunPaused)
+            {
+                if (M3Widgets.Button("##craft_stock_resume", "继续", M3ButtonStyle.Filled, FontAwesomeIcon.Play))
+                {
+                    CraftingGatherBridge.SetUserPaused(false);
+                }
+
+                ImGui.SameLine();
+            }
+
+            if (M3Widgets.Button("##craft_stock_stop", "停止", M3ButtonStyle.Danger, FontAwesomeIcon.Stop, tooltip: stopTooltip))
+            {
+                CraftingGatherBridge.StopQueue();
+            }
+
+            return;
+        }
+
         if (_queueProcessor == null)
         {
             return;
@@ -174,16 +200,16 @@ public class CraftingStatusWindow : M3Window
         {
             if (M3Widgets.Button("##craft_resume", "继续", M3ButtonStyle.Filled, FontAwesomeIcon.Play))
             {
-                _queueProcessor.Resume();
+                CraftingGatherBridge.SetUserPaused(false);
             }
         }
         else if (M3Widgets.Button("##craft_pause", "暂停", M3ButtonStyle.Tonal, FontAwesomeIcon.Pause))
         {
-            _queueProcessor.Pause();
+            CraftingGatherBridge.SetUserPaused(true);
         }
 
         ImGui.SameLine();
-        if (M3Widgets.Button("##craft_stop", "停止", M3ButtonStyle.Danger, FontAwesomeIcon.Stop, tooltip: "停止制作队列。"))
+        if (M3Widgets.Button("##craft_stop", "停止", M3ButtonStyle.Danger, FontAwesomeIcon.Stop, tooltip: stopTooltip))
         {
             CraftingGatherBridge.StopQueue();
         }

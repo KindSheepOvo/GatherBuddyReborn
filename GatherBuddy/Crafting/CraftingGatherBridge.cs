@@ -14,7 +14,7 @@ using System.Linq;
 
 namespace GatherBuddy.Crafting;
 
-public static class CraftingGatherBridge
+public static partial class CraftingGatherBridge
 {
     private static AutoGatherList? _gatherList;
     private static global::GatherBuddy.GatherBuddy? _plugin;
@@ -25,17 +25,14 @@ public static class CraftingGatherBridge
     private static CraftingQueueProcessor? _queueProcessor = null;
     private static CraftingExecutionPlan? _activeExecutionPlan = null;
     private static bool _isQueueMode = false;
-    private static readonly List<AutoGatherList> _disabledGatherLists = [];
     private static int? _ephemeralListId = null;
     private static bool _waitingForCollectables = false;
     private static bool _collectablesStartPending = false;
+    private static bool _waitingForCollectablesHomeReturn;
+    private static bool _collectablesHomeReturnStarted;
     private static DateTime _nextCollectablesRetry = DateTime.MinValue;
     private static DateTime _lastCollectablesWaitLog = DateTime.MinValue;
     private static DateTime _lastCollectablesExitAttempt = DateTime.MinValue;
-    private static DateTime _lastCollectablesHardFailLog = DateTime.MinValue;
-    private static bool _waitingForCollectablesHomeReturn = false;
-    private static bool _finalCollectablesRunDone = false;
-    private static bool _collectablesHomeReturnStarted = false;
 
     public static bool PreserveListOnDisable { get; set; } = false;
 
@@ -59,7 +56,7 @@ public static class CraftingGatherBridge
     }
 
     public static uint RecipeToCraft => _recipeIdToCraft;
-    public static bool WaitingForGatherComplete => _waitingForGatherComplete;
+    public static bool WaitingForGatherComplete => _stockRun == null && _waitingForGatherComplete;
 
     public static AutoGatherList? GetTemporaryGatherList() => _gatherList;
     public static CraftingExecutionPlan? GetActiveExecutionPlan()
@@ -76,9 +73,9 @@ public static class CraftingGatherBridge
         {
             try
             {
-                _plugin.AutoGatherListsManager.DeleteList(_gatherList);
                 GatherBuddy.Log.Debug($"[CraftingGatherBridge] Deleted temporary gather list: {_gatherList.Name}");
                 _gatherList = null;
+                _plugin.AutoGatherListsManager.SetCraftingGatherList(null);
             }
             catch (Exception ex)
             {
@@ -172,19 +169,17 @@ public static class CraftingGatherBridge
     {
         if (_isQueueMode && _queueProcessor != null)
         {
-            UpdateCollectablesHomeReturnBeforeResume();
-            TryStartCollectablesInterruption();
-            _queueProcessor.Update();
+            if (_queueProcessor.NeedsUpdate)
+            {
+                _queueProcessor.Update();
+            }
 
-            if (_queueProcessor.CurrentState == CraftingQueueProcessor.QueueState.Complete
-             && !_queueProcessor.HasPendingTasks()
-             && !_collectablesStartPending
-             && !_waitingForCollectables
-             && !_waitingForCollectablesHomeReturn)
+            if (_stockRun == null && _queueProcessor.CurrentState == CraftingQueueProcessor.QueueState.Complete
+             && !_queueProcessor.HasPendingTasks())
             {
                 GatherBuddy.Log.Information("[CraftingGatherBridge] All completion tasks done, cleaning up");
-                RestoreDisabledGatherLists();
                 GatherBuddy.CraftingStatusWindow?.SetQueueProcessor(null);
+                _queueProcessor.Reset();
                 _queueProcessor = null;
                 _activeExecutionPlan = null;
                 _isQueueMode = false;
@@ -217,7 +212,12 @@ public static class CraftingGatherBridge
     {
         if (_isQueueMode && _queueProcessor != null)
         {
+            var wasCrafting = _queueProcessor.CurrentState == CraftingQueueProcessor.QueueState.Crafting;
             _queueProcessor.OnCraftFinished(recipe, cancelled);
+            if (wasCrafting)
+            {
+                MarkStockPlanDirty();
+            }
         }
     }
 
@@ -229,49 +229,37 @@ public static class CraftingGatherBridge
         CreateGatherListForMissingIngredients(missing);
     }
 
-    public static void StartQueueCraftAndGather(CraftingExecutionPlan executionPlan, CraftingListConsumableSettings? listConsumables = null, int? ephemeralListId = null)
+    private static void StartQueue(CraftingExecutionPlan executionPlan, CraftingListConsumableSettings? listConsumables = null, int? ephemeralListId = null)
     {
+        StopTemporaryGathering();
+        _queueProcessor?.Reset();
         _isQueueMode = true;
         _ephemeralListId = ephemeralListId;
         _activeExecutionPlan = executionPlan;
         ResetCollectablesInterruptionState();
-        _finalCollectablesRunDone = false;
-        _lastCollectablesHardFailLog = DateTime.MinValue;
         _queueProcessor = new CraftingQueueProcessor();
         _queueProcessor.QueueCompleted += OnQueueCompleted;
+        if (_stockRun != null)
+        {
+            _queueProcessor.StateChanged += OnStockQueueStateChanged;
+            _queueProcessor.StockCheckpointAvailable += OnStockCheckpoint;
+        }
         _waitingForGatherComplete = true;
         GatherBuddy.Log.Information($"[CraftingGatherBridge] Starting queue automation with {executionPlan.QueueView.Count} recipes, retainerRestock={executionPlan.RetainerRestock}");
         _queueProcessor.StartQueue(executionPlan, listConsumables, GatherBuddy.RaphaelSolveCoordinator);
-        var hasRetainerWork = executionPlan.RetainerRestock && AllaganTools.Enabled
-            && (executionPlan.Materials.Count > 0 || executionPlan.RetainerConsumedCraftables.Count > 0);
+        var hasRetainerWork = _queueProcessor.CurrentState != CraftingQueueProcessor.QueueState.WaitingForGather;
         if (!hasRetainerWork)
         {
             CreateGatherListForMissingIngredients(executionPlan.Materials);
         }
 
-        GatherBuddy.CraftingStatusWindow?.SetQueueProcessor(_queueProcessor);
+        GatherBuddy.CraftingStatusWindow?.SetQueueProcessor(_queueProcessor, restoreWindow: _stockRun == null);
     }
 
     public static void CreateGatherListForMissingIngredients(Dictionary<uint, int> missing)
     {
         try
         {
-            if (_plugin != null)
-            {
-                var enabledLists = _plugin.AutoGatherListsManager.Lists.Where(l => l.Enabled && !l.Fallback).ToList();
-                if (enabledLists.Count > 0)
-                {
-                    _disabledGatherLists.Clear();
-                    foreach (var existingList in enabledLists)
-                    {
-                        existingList.Enabled = false;
-                        _disabledGatherLists.Add(existingList);
-                        GatherBuddy.Log.Debug($"[CraftingGatherBridge] Disabled gather list '{existingList.Name}' before starting craft gather");
-                    }
-                    _plugin.AutoGatherListsManager.Save();
-                }
-            }
-
             _gatherList = new AutoGatherList()
             {
                 Name = "制作材料 (自动生成)",
@@ -303,8 +291,7 @@ public static class CraftingGatherBridge
 
             if (_gatherList.Items.Count > 0 && _plugin != null)
             {
-                _plugin.AutoGatherListsManager.AddList(_gatherList);
-                _plugin.AutoGatherListsManager.SetActiveItems();
+                _plugin.AutoGatherListsManager.SetCraftingGatherList(_gatherList);
 
                 if (IsGatheringComplete())
                 {
@@ -315,6 +302,12 @@ public static class CraftingGatherBridge
                 {
                     _waitingForGatherComplete = true;
                     GatherBuddy.AutoGather.Enabled = true;
+                    if (!GatherBuddy.AutoGather.Enabled)
+                    {
+                        OnGatherEnabledChanged(enabled: false);
+                        return;
+                    }
+
                     GatherBuddy.Log.Information($"已创建包含 {_gatherList.Items.Count} 个物品的制作采集清单，开始自动采集。");
                 }
             }
@@ -461,137 +454,83 @@ public static class CraftingGatherBridge
         GatherBuddy.CraftingStatusWindow?.SetQueueProcessor(_queueProcessor);
     }
 
-    private static void RestoreDisabledGatherLists()
-    {
-        if (_disabledGatherLists.Count == 0 || _plugin == null)
-        {
-            return;
-        }
-
-        foreach (var list in _disabledGatherLists)
-        {
-            list.Enabled = true;
-            GatherBuddy.Log.Debug($"[CraftingGatherBridge] Re-enabled gather list '{list.Name}'");
-        }
-        _plugin.AutoGatherListsManager.SetActiveItems();
-        _plugin.AutoGatherListsManager.Save();
-        _disabledGatherLists.Clear();
-    }
-
     private static void OnQueueCompleted()
     {
         GatherBuddy.Log.Information("[CraftingGatherBridge] Queue completed, will clean up after tasks finish");
     }
 
-    private static void TryStartCollectablesInterruption()
+    private static bool TryBeginStockTurnIn(CraftingStockRun run)
     {
-        if (_queueProcessor == null
-         || _queueProcessor.CurrentState == CraftingQueueProcessor.QueueState.Idle
-         || GatherBuddy.CollectableManager == null
-         || GatherBuddy.CollectableManager.IsRunning
-         || _waitingForCollectablesHomeReturn
-         || DateTime.UtcNow < _nextCollectablesRetry)
+        if (!_collectablesCheckPending)
         {
+            return false;
+        }
+
+        _collectablesCheckPending = false;
+        var config = GatherBuddy.Config.CollectableConfig;
+        if (!run.AllowCollectableTurnIn || !config.AutoTurnInCollectables || DateTime.UtcNow < _nextCollectablesRetry
+            || GatherBuddy.CollectableManager is not { IsRunning: false } || !CollectableTurnInRequirements.IsAvailable
+            || !CollectableInventoryHelper.GetThresholdState(config).ThresholdReached)
+        {
+            return false;
+        }
+
+        StopTemporaryGathering();
+        _queueProcessor?.Pause();
+        _collectablesStartPending = true;
+        SetStockStatus("准备交纳背包中的收藏品");
+        ContinueStockTurnIn(run);
+        return true;
+    }
+
+    private static void ContinueStockTurnIn(CraftingStockRun run)
+    {
+        if (!GatherBuddy.Config.CollectableConfig.AutoTurnInCollectables || !CollectableTurnInRequirements.IsAvailable)
+        {
+            ResumeStockAfterCollectables(run);
             return;
         }
 
-        if (_waitingForCollectables)
+        if (GatherBuddy.CollectableManager is not { IsRunning: false } manager)
         {
+            ScheduleStockWork(ReadinessRetryDelay);
             return;
-        }
-
-        var queueComplete = _queueProcessor.CurrentState == CraftingQueueProcessor.QueueState.Complete;
-        if (queueComplete && !_collectablesStartPending && (_finalCollectablesRunDone || _queueProcessor.HasPendingTasks()))
-        {
-            return;
-        }
-
-        var collectableConfig = GatherBuddy.Config.CollectableConfig;
-        if (!collectableConfig.AutoTurnInCollectables)
-        {
-            if (_collectablesStartPending)
-            {
-                GatherBuddy.Log.Information("[CraftingGatherBridge] Collectables interruption was pending when auto turn-ins were forced off, resuming the queue without starting collectables");
-                ResetCollectablesInterruptionState();
-                _queueProcessor.Resume();
-            }
-            LogCollectablesHardFailState(collectableConfig.AutoTurnInHardFailReason);
-            return;
-        }
-
-        if (!CollectableTurnInRequirements.IsAvailable)
-        {
-            if (_collectablesStartPending)
-            {
-                GatherBuddy.Log.Debug("[CraftingGatherBridge] Collectables interruption was pending when neither AllaganTools nor AllaganItemSearch was loaded, resuming the queue without starting collectables");
-                ResetCollectablesInterruptionState();
-                _queueProcessor.Resume();
-            }
-            return;
-        }
-
-        if (!_collectablesStartPending)
-        {
-            if (_queueProcessor.Paused)
-            {
-                return;
-            }
-
-            var thresholdState = CollectableInventoryHelper.GetThresholdState(GatherBuddy.Config.CollectableConfig);
-            if (!thresholdState.ThresholdReached)
-            {
-                return;
-            }
-
-            if (queueComplete)
-            {
-                GatherBuddy.Log.Information($"[CraftingGatherBridge] Queue finished with the collectables threshold reached ({thresholdState.CollectableCount}), turning in before cleanup");
-                _finalCollectablesRunDone = true;
-            }
-
-            _queueProcessor.Pause();
-            _collectablesStartPending = true;
-            _lastCollectablesWaitLog = DateTime.MinValue;
-            _lastCollectablesExitAttempt = DateTime.MinValue;
         }
 
         TryExitCraftingUiForCollectables();
-        if (!IsReadyToStartCollectables(out var waitReason))
+        if (!IsReadyToStartCollectables(out var waitReason) || IsWaitingForCollectablesRouteData(out waitReason))
         {
             LogCollectablesWaitReason(waitReason);
+            ScheduleStockWork(ReadinessRetryDelay);
             return;
         }
 
-        if (IsWaitingForCollectablesRouteData(out waitReason))
+        if (manager.Start(CollectableRunSource.VulcanQueue, returnHomeAfterCompletion: true))
         {
-            LogCollectablesWaitReason(waitReason);
-            return;
-        }
-
-        if (GatherBuddy.CollectableManager.Start(CollectableRunSource.VulcanQueue, returnHomeAfterCompletion: true))
-        {
+            run.CaptureCollectableStock();
             _collectablesStartPending = false;
             _waitingForCollectables = true;
             _lastCollectablesWaitLog = DateTime.MinValue;
             _lastCollectablesExitAttempt = DateTime.MinValue;
-            return;
+            SetStockStatus("正在交纳收藏品");
         }
-
-        if (IsWaitingForCollectablesRouteData(out waitReason))
+        else if (IsWaitingForCollectablesRouteData(out waitReason))
         {
             LogCollectablesWaitReason(waitReason);
-            return;
+            ScheduleStockWork(ReadinessRetryDelay);
         }
-
-        GatherBuddy.Log.Warning($"[CraftingGatherBridge] Failed to start collectables interruption: {GatherBuddy.CollectableManager.StatusText}");
-        ResetCollectablesInterruptionState();
-        _nextCollectablesRetry = DateTime.UtcNow.AddSeconds(5);
-        _queueProcessor.Resume();
+        else
+        {
+            GatherBuddy.Log.Warning($"[CraftingGatherBridge] Failed to start collectables interruption: {manager.StatusText}");
+            _nextCollectablesRetry = DateTime.UtcNow.AddSeconds(5);
+            ResumeStockAfterCollectables(run);
+        }
     }
 
     private static void TryExitCraftingUiForCollectables()
     {
-        if (CraftingGameInterop.CurrentState != CraftingGameInterop.CraftState.IdleBetween)
+        if (CraftingGameInterop.CurrentState != CraftingGameInterop.CraftState.IdleBetween
+         && (CraftingGameInterop.CurrentState != CraftingGameInterop.CraftState.IdleNormal || !IsCraftingAddonVisible("RecipeNote")))
         {
             return;
         }
@@ -707,100 +646,98 @@ public static class CraftingGatherBridge
 
     private static void OnCollectablesFinished()
     {
-        if (!_waitingForCollectables && !_collectablesStartPending)
+        if (_waitingForCollectables && _stockRun is { } run)
         {
-            return;
+            ResumeStockAfterCollectables(run);
         }
+    }
 
+    private static void ResumeStockAfterCollectables(CraftingStockRun run)
+    {
+        run.AccountForTurnedInCollectables();
         ResetCollectablesInterruptionState();
-        _queueProcessor?.Resume();
+        _collectablesCheckPending = false;
+        DiscardStockQueue();
+        SetStockStatus(run.Paused ? "制作清单已暂停" : "正在按当前库存计算剩余制作");
+        GatherBuddy.CraftingStatusWindow?.SetQueueProcessor(null, restoreWindow: false);
+        GatherBuddy.CraftingStatusWindow?.OpenOrRestore();
+        MarkStockPlanDirty();
     }
 
     private static void OnCollectablesError(string error)
     {
-        if (!_waitingForCollectables && !_collectablesStartPending)
+        if (!_waitingForCollectables || _stockRun is not { } run)
         {
             return;
         }
 
         GatherBuddy.Log.Error($"[CraftingGatherBridge] Collectables interruption failed: {error}");
-        var hardFailReason = GatherBuddy.Config.CollectableConfig.AutoTurnInHardFailReason;
-        if (!GatherBuddy.Config.CollectableConfig.AutoTurnInCollectables && !string.IsNullOrWhiteSpace(hardFailReason))
+        var config = GatherBuddy.Config.CollectableConfig;
+        if (!config.AutoTurnInCollectables && !string.IsNullOrWhiteSpace(config.AutoTurnInHardFailReason))
         {
-            LogCollectablesHardFailState(hardFailReason);
-            StartCollectablesHomeReturnBeforeResume(hardFailReason);
+            run.AccountForTurnedInCollectables();
+            _waitingForCollectables = false;
+            _waitingForCollectablesHomeReturn = true;
+            SetStockStatus("已停止交纳收藏品，正在返回家园");
+            ScheduleStockWork(InventorySettleDelay);
             return;
         }
 
-        ResetCollectablesInterruptionState();
         _nextCollectablesRetry = DateTime.UtcNow.AddSeconds(5);
-        _lastCollectablesWaitLog = DateTime.MinValue;
-        _lastCollectablesExitAttempt = DateTime.MinValue;
-        _lastCollectablesHardFailLog = DateTime.MinValue;
-        _queueProcessor?.Resume();
+        ResumeStockAfterCollectables(run);
     }
 
-    private static void StartCollectablesHomeReturnBeforeResume(string hardFailReason)
+    private static void ContinueCollectablesHomeReturn(CraftingStockRun run)
     {
-        _collectablesStartPending = false;
-        _waitingForCollectables = false;
-        _waitingForCollectablesHomeReturn = true;
-        _collectablesHomeReturnStarted = false;
-        _nextCollectablesRetry = DateTime.MinValue;
-        _lastCollectablesWaitLog = DateTime.MinValue;
-        _lastCollectablesExitAttempt = DateTime.MinValue;
-        GatherBuddy.Log.Warning("[CraftingGatherBridge] Returning home before resuming the queue after collectables hard fail");
-    }
-
-    private static void UpdateCollectablesHomeReturnBeforeResume()
-    {
-        if (!_waitingForCollectablesHomeReturn)
-        {
-            return;
-        }
-
         if (!_collectablesHomeReturnStarted)
         {
-            if (Lifestream.Enabled && Lifestream.IsBusy())
+            if (HomeNavigationHelper.TryStartReturnHome(out var error))
             {
+                _collectablesHomeReturnStarted = true;
+                ScheduleStockWork(ReadinessRetryDelay);
                 return;
             }
 
-            if (!HomeNavigationHelper.TryStartReturnHome(out var error))
+            if (string.IsNullOrWhiteSpace(error))
             {
-                if (string.IsNullOrWhiteSpace(error))
-                {
-                    return;
-                }
-
-                GatherBuddy.Log.Warning($"[CraftingGatherBridge] {error}");
-                GatherBuddy.Log.Warning("[CraftingGatherBridge] Resuming the queue without a home return after collectables hard fail");
-                ResetCollectablesInterruptionState();
-                _queueProcessor?.Resume();
+                ScheduleStockWork(ReadinessRetryDelay);
                 return;
             }
 
-            _collectablesHomeReturnStarted = true;
-            return;
+            GatherBuddy.Log.Warning($"[CraftingGatherBridge] {error}");
         }
-
-        if (!HomeNavigationHelper.IsReturnComplete())
+        else if (!HomeNavigationHelper.IsReturnComplete())
         {
+            ScheduleStockWork(ReadinessRetryDelay);
             return;
         }
 
-        GatherBuddy.Log.Information("[CraftingGatherBridge] Home return complete, resuming the queue after collectables hard fail");
-        ResetCollectablesInterruptionState();
-        _queueProcessor?.Resume();
+        ResumeStockAfterCollectables(run);
+    }
+
+    private static void OnStockTurnInStopped()
+    {
+        if (_waitingForCollectables && _stockRun is { } run)
+        {
+            run.AccountForTurnedInCollectables();
+            ResetCollectablesInterruptionState();
+            PauseStockRun("收藏品交纳已停止。点击「继续」按当前库存重新计算。");
+            GatherBuddy.CraftingStatusWindow?.OpenOrRestore();
+        }
     }
 
     public static void StopQueue()
     {
+        if (_stockRun != null)
+        {
+            FinishStockRun(completed: false);
+            return;
+        }
+
         if (_queueProcessor != null)
         {
             GatherBuddy.Log.Information("[CraftingGatherBridge] Stopping queue processor");
             ResetCollectablesInterruptionState();
-            _lastCollectablesHardFailLog = DateTime.MinValue;
             _ephemeralListId = null;
             GatherBuddy.AutoGather.Enabled = false;
             CraftingGameInterop.CancelCurrentCraft();
@@ -809,7 +746,6 @@ public static class CraftingGatherBridge
             _queueProcessor = null;
             _activeExecutionPlan = null;
             _isQueueMode = false;
-            RestoreDisabledGatherLists();
             GatherBuddy.CraftingStatusWindow?.SetQueueProcessor(null);
         }
         else
@@ -826,33 +762,13 @@ public static class CraftingGatherBridge
         }
     }
 
-    private static void LogCollectablesHardFailState(string hardFailReason)
-    {
-        if (string.IsNullOrWhiteSpace(hardFailReason))
-        {
-            return;
-        }
-
-        if (_lastCollectablesHardFailLog != DateTime.MinValue && DateTime.UtcNow - _lastCollectablesHardFailLog < TimeSpan.FromSeconds(30))
-        {
-            return;
-        }
-
-        GatherBuddy.Log.Warning($"[CraftingGatherBridge] Skipping collectables interruption because auto turn-ins were forced off: {hardFailReason}");
-        _lastCollectablesHardFailLog = DateTime.UtcNow;
-    }
-
     private static void ResetCollectablesInterruptionState()
     {
         _collectablesStartPending = false;
         _waitingForCollectables = false;
         _waitingForCollectablesHomeReturn = false;
         _collectablesHomeReturnStarted = false;
-        _nextCollectablesRetry = DateTime.MinValue;
         _lastCollectablesWaitLog = DateTime.MinValue;
         _lastCollectablesExitAttempt = DateTime.MinValue;
     }
-
-    internal static void Dispose()
-        => VulcanRetainerPreview.Dispose();
 }

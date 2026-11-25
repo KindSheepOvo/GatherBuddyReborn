@@ -44,8 +44,6 @@ internal unsafe class RetainerTaskExecutor
         Aborted
     }
 
-    private record struct RetainerEntry(uint SortedIndex, ulong RetainerId);
-
     private record struct WithdrawTarget(uint ItemId, int AmountHQ, int AmountNQ)
     {
         public int RemainingHQ = AmountHQ;
@@ -56,7 +54,7 @@ internal unsafe class RetainerTaskExecutor
     private Phase _phase = Phase.InteractBell;
     private DateTime _nextRetry = DateTime.MinValue;
 
-    private readonly List<RetainerEntry> _retainersToVisit = [];
+    private readonly List<VulcanRetainerInventory.Retainer> _retainersToVisit = [];
     private int _retainerVisitIndex = 0;
 
     private List<WithdrawTarget> _currentRetainerItems = [];
@@ -66,41 +64,61 @@ internal unsafe class RetainerTaskExecutor
     private InventoryType _foundSlotInventory = InventoryType.Invalid;
     private uint _foundSlotIndex = uint.MaxValue;
     private bool _foundSlotRequiresQuantityInput = false;
+    private int _requestedQuantity;
+    private bool _openedInventory;
 
     private int _addonRetryCount = 0;
     private const int MaxAddonRetries = 40;
     private readonly Dictionary<uint, int> _materials;
     private readonly Dictionary<uint, IngredientQualityDemand> _qualityTargets;
     private readonly HashSet<uint> _precraftItemIds;
-    private bool _withdrawalPlanBuilt;
+    private readonly VulcanRetainerInventory _inventory;
+    private readonly bool _verifyOnly;
+    private RetainerBellNavigator? _verificationNavigator;
+    private bool _closeRequested;
 
-    public bool IsComplete => _phase == Phase.Complete;
-    public bool IsAborted => _phase == Phase.Aborted;
+    public bool IsComplete => _phase == Phase.Complete && FailureReason == null;
+    public bool IsAborted => _phase == Phase.Aborted || FailureReason != null;
+    internal string? FailureReason { get; private set; }
+    internal bool CloseRequested => _closeRequested;
+    internal TimeSpan NextCheckDelay => TimeSpan.FromMilliseconds(Math.Max(100, (_nextRetry - DateTime.Now).TotalMilliseconds));
+
+    public RetainerTaskExecutor(VulcanRetainerInventory inventory)
+        : this(inventory, [], [])
+    {
+        _verifyOnly = true;
+    }
 
     public RetainerTaskExecutor(
+        VulcanRetainerInventory inventory,
         Dictionary<uint, int> materials,
         Dictionary<uint, IngredientQualityDemand> qualityTargets,
         HashSet<uint>? precraftItemIds = null)
     {
+        _inventory = inventory;
         _materials = materials;
         _qualityTargets = qualityTargets;
         _precraftItemIds = precraftItemIds ?? [];
     }
 
-    private bool BuildWithdrawalPlan()
+    private bool BuildVisitPlan()
     {
-        _retainersToVisit.Clear();
-        var perRetainerPlan = new Dictionary<ulong, Dictionary<uint, (int NeedHQ, int NeedNQ)>>();
-        var retainerIds = RetainerItemQuery.GetOwnedRetainerIds();
-        if (retainerIds.Count == 0)
+        if (!_inventory.ReadRetainerList())
         {
-            retainerIds = GetRetainerIdsFromManager();
+            return false;
         }
 
-        if (retainerIds.Count == 0)
+        _inventory.ReadCurrentGameSnapshots();
+        if (_verifyOnly)
         {
-            GatherBuddy.Log.Debug("[RetainerTaskExecutor] No retainer ids available to build withdrawal plan yet");
-            return false;
+            _retainersToVisit.AddRange(_inventory.Retainers.Where(retainer => !_inventory.HasInventory(retainer.Id)));
+            return true;
+        }
+
+        if (!_inventory.IsComplete)
+        {
+            FailureReason = "雇员库存需要重新核实。点击「继续」后重新计算缺口。";
+            return true;
         }
 
         foreach (var (itemId, totalNeeded) in _materials)
@@ -109,126 +127,77 @@ internal unsafe class RetainerTaskExecutor
                 ? qualityDemand
                 : IngredientQualityDemand.FromPreferHQ(totalNeeded);
 
-            IngredientQualityDemand remainingDemand;
-            if (_precraftItemIds.Contains(itemId))
+            var remainingDemand = demand;
+            if (!_precraftItemIds.Contains(itemId))
             {
-                GatherBuddy.Log.Debug($"[RetainerTaskExecutor] Precraft item {itemId}: pulling exact retainer amount {demand.Total} (inventory already accounted for in plan)");
-                remainingDemand = demand;
-            }
-            else
-            {
-                int inBagHQ = 0, inBagNQ = 0;
-                var inventoryMgr = InventoryManager.Instance();
-                if (inventoryMgr != null)
-                {
-                    inBagHQ = (int)inventoryMgr->GetInventoryItemCount(itemId, true, false, false);
-                    inBagNQ = (int)inventoryMgr->GetInventoryItemCount(itemId, false, false, false);
-                }
+                var (inBagNQ, inBagHQ) = CraftingStockRun.GetInventoryCounts(itemId);
                 remainingDemand = demand.ConsumeSplit(inBagNQ, inBagHQ, out _, out _);
             }
 
-            if (remainingDemand.Total <= 0)
+            foreach (var retainer in _inventory.Retainers)
             {
-                continue;
-            }
-
-            foreach (var retainerId in retainerIds)
-            {
-
-                int retainerHQ = 0, retainerNQ = 0;
-                for (uint page = 10000; page <= 10006; page++)
+                if (remainingDemand.Total <= 0)
                 {
-                    var pageHQ = (int)AllaganTools.ItemCountHQ(itemId, retainerId, page);
-                    retainerHQ += pageHQ;
-                    retainerNQ += (int)AllaganTools.ItemCount(itemId, retainerId, page) - pageHQ;
+                    break;
                 }
-                var crystalPageHQ = (int)AllaganTools.ItemCountHQ(itemId, retainerId, 12001);
-                retainerHQ += crystalPageHQ;
-                retainerNQ += (int)AllaganTools.ItemCount(itemId, retainerId, 12001) - crystalPageHQ;
-                var updatedDemand = remainingDemand.ConsumeSplit(retainerNQ, retainerHQ, out var toTakeNQ, out var toTakeHQ);
 
+                var (retainerNQ, retainerHQ) = _inventory.GetCounts(retainer.Id, itemId);
+                remainingDemand = remainingDemand.ConsumeSplit(retainerNQ, retainerHQ, out var toTakeNQ, out var toTakeHQ);
                 if (toTakeHQ <= 0 && toTakeNQ <= 0)
                 {
                     continue;
                 }
 
-                if (!perRetainerPlan.ContainsKey(retainerId))
+                if (!_perRetainerPlan.TryGetValue(retainer.Id, out var items))
                 {
-                    perRetainerPlan[retainerId] = [];
+                    _perRetainerPlan[retainer.Id] = items = [];
                 }
 
-                if (perRetainerPlan[retainerId].TryGetValue(itemId, out var existing))
-                {
-                    perRetainerPlan[retainerId][itemId] = (existing.NeedHQ + toTakeHQ, existing.NeedNQ + toTakeNQ);
-                }
-                else
-                {
-                    perRetainerPlan[retainerId][itemId] = (toTakeHQ, toTakeNQ);
-                }
-
-                remainingDemand = updatedDemand;
-                if (remainingDemand.Total <= 0)
-                {
-                    break;
-                }
+                items[itemId] = (toTakeHQ, toTakeNQ);
             }
         }
 
-        _perRetainerPlan = perRetainerPlan;
-        if (_perRetainerPlan.Count == 0)
-        {
-            GatherBuddy.Log.Debug("[RetainerTaskExecutor] No retainer items to withdraw, completing immediately");
-            return true;
-        }
+        _retainersToVisit.AddRange(_inventory.Retainers.Where(retainer => _perRetainerPlan.ContainsKey(retainer.Id)));
+        return true;
+    }
 
-        var retainerMgr = RetainerManager.Instance();
-        if (retainerMgr == null)
+    private readonly Dictionary<ulong, Dictionary<uint, (int NeedHQ, int NeedNQ)>> _perRetainerPlan = [];
+
+    internal void StopNavigation()
+    {
+        _verificationNavigator?.Stop();
+        _verificationNavigator = null;
+    }
+
+    internal bool RequestClose()
+    {
+        if (_phase is Phase.InteractBell or Phase.Complete or Phase.Aborted)
         {
-            GatherBuddy.Log.Debug("[RetainerTaskExecutor] RetainerManager unavailable while mapping withdrawal plan");
             return false;
         }
 
-        for (uint i = 0; i < retainerMgr->GetRetainerCount(); i++)
-        {
-            var retainer = retainerMgr->GetRetainerBySortedIndex(i);
-            if (retainer == null || retainer->RetainerId == 0)
-            {
-                continue;
-            }
-
-            if (!_perRetainerPlan.TryGetValue(retainer->RetainerId, out var items))
-            {
-                continue;
-            }
-
-            if (!items.Values.Any(v => v.NeedHQ > 0 || v.NeedNQ > 0))
-            {
-                continue;
-            }
-
-            _retainersToVisit.Add(new RetainerEntry(i, retainer->RetainerId));
-        }
-
-        GatherBuddy.Log.Debug($"[RetainerTaskExecutor] Plan: {_retainersToVisit.Count} retainer(s) to visit");
-        foreach (var r in _retainersToVisit)
-        {
-            var items = _perRetainerPlan[r.RetainerId];
-            foreach (var (itemId, amounts) in items)
-            {
-                GatherBuddy.Log.Debug($"[RetainerTaskExecutor]   Retainer {r.SortedIndex} ({r.RetainerId}): item {itemId} HQ={amounts.NeedHQ} NQ={amounts.NeedNQ}");
-            }
-        }
-
-        return _retainersToVisit.Count > 0;
+        _closeRequested = true;
+        return true;
     }
-
-    private Dictionary<ulong, Dictionary<uint, (int NeedHQ, int NeedNQ)>> _perRetainerPlan = [];
 
     public CraftingTasks.TaskResult Tick()
     {
         if (DateTime.Now < _nextRetry)
         {
             return CraftingTasks.TaskResult.Retry;
+        }
+
+        if (_closeRequested)
+        {
+            _phase = _phase switch
+            {
+                Phase.WaitOccupied => _phase,
+                _ when !Dalamud.Conditions[ConditionFlag.OccupiedSummoningBell] => Phase.Complete,
+                Phase.WaitRetainerList or Phase.SelectRetainer => Phase.CloseRetainerList,
+                Phase.SelectEntrustWithdraw => Phase.SelectQuit,
+                Phase.WithdrawNextItem or Phase.FindItemSlot or Phase.DispatchRetrieveCommand => Phase.CloseRetainerInventory,
+                _ => _phase,
+            };
         }
 
         return _phase switch
@@ -262,17 +231,42 @@ internal unsafe class RetainerTaskExecutor
     {
         if (Dalamud.Conditions[ConditionFlag.OccupiedSummoningBell])
         {
+            StopNavigation();
             GatherBuddy.Log.Debug("[RetainerTaskExecutor] Already at bell, waiting for retainer list");
             _phase = Phase.WaitRetainerList;
             return CraftingTasks.TaskResult.Retry;
         }
 
+        var navigator = _verificationNavigator;
+        if (navigator != null)
+        {
+            navigator.Update();
+            if (!navigator.IsComplete)
+            {
+                Delay(250);
+                return CraftingTasks.TaskResult.Retry;
+            }
+
+            StopNavigation();
+        }
+
         var bell = FindNearestBell();
         if (bell == null)
         {
-            GatherBuddy.Log.Warning("[RetainerTaskExecutor] No reachable retainer bell found, aborting retainer stage");
-            _phase = Phase.Aborted;
-            return CraftingTasks.TaskResult.Done;
+            if (_verifyOnly && navigator == null && GatherBuddy.Config.VulcanRetainerBellConfig.AutoNavigateToRetainerBell
+                && FindNearestBellForNavigation() is { } distantBell)
+            {
+                _verificationNavigator = new RetainerBellNavigator();
+                if (_verificationNavigator.StartNavigation(distantBell))
+                {
+                    Delay(250);
+                    return CraftingTasks.TaskResult.Retry;
+                }
+
+                StopNavigation();
+            }
+
+            return Abort("需要读取雇员库存。请靠近可用的传唤铃后点击「继续」。");
         }
 
         TargetSystem.Instance()->OpenObjectInteraction((FFXIVClientStructs.FFXIV.Client.Game.Object.GameObject*)bell.Address);
@@ -295,43 +289,19 @@ internal unsafe class RetainerTaskExecutor
         {
             GatherBuddy.Log.Debug("[RetainerTaskExecutor] Talk dialog visible, dismissing");
             new AddonMaster.Talk((nint)talk).Click();
-            Delay(300);
-            return CraftingTasks.TaskResult.Retry;
+            return RetryAddon("未能打开传唤铃。请检查角色状态后点击「继续」。", 300);
         }
 
-        _addonRetryCount++;
-        if (_addonRetryCount > MaxAddonRetries)
-        {
-            GatherBuddy.Log.Warning("[RetainerTaskExecutor] Timed out waiting for OccupiedSummoningBell");
-            _phase = Phase.Aborted;
-            return CraftingTasks.TaskResult.Done;
-        }
-
-        Delay(150);
-        return CraftingTasks.TaskResult.Retry;
+        return RetryAddon("未能打开传唤铃。请检查角色状态后点击「继续」。");
     }
 
     private CraftingTasks.TaskResult TickWaitRetainerList()
     {
         if (GenericHelpers.TryGetAddonByName<AtkUnitBase>("RetainerList", out var addon) && addon->IsVisible)
         {
-            if (!_withdrawalPlanBuilt)
+            if (!BuildVisitPlan())
             {
-                if (!BuildWithdrawalPlan())
-                {
-                    _addonRetryCount++;
-                    if (_addonRetryCount > MaxAddonRetries)
-                    {
-                        GatherBuddy.Log.Warning("[RetainerTaskExecutor] Timed out building retainer withdrawal plan after opening RetainerList");
-                        _phase = Phase.Aborted;
-                        return CraftingTasks.TaskResult.Done;
-                    }
-
-                    Delay(150);
-                    return CraftingTasks.TaskResult.Retry;
-                }
-
-                _withdrawalPlanBuilt = true;
+                return RetryAddon("游戏未能加载雇员名单。请结束当前雇员操作后点击「继续」。");
             }
             _retainerVisitIndex = 0;
             _addonRetryCount = 0;
@@ -342,25 +312,15 @@ internal unsafe class RetainerTaskExecutor
         if (GenericHelpers.TryGetAddonByName<AddonTalk>("Talk", out var talk) && talk->AtkUnitBase.IsVisible)
         {
             new AddonMaster.Talk((nint)talk).Click();
-            Delay(300);
-            return CraftingTasks.TaskResult.Retry;
+            return RetryAddon("游戏未能打开雇员名单。请结束当前雇员操作后点击「继续」。", 300);
         }
 
-        _addonRetryCount++;
-        if (_addonRetryCount > MaxAddonRetries)
-        {
-            GatherBuddy.Log.Warning("[RetainerTaskExecutor] Timed out waiting for RetainerList");
-            _phase = Phase.Aborted;
-            return CraftingTasks.TaskResult.Done;
-        }
-
-        Delay(150);
-        return CraftingTasks.TaskResult.Retry;
+        return RetryAddon("游戏未能打开雇员名单。请结束当前雇员操作后点击「继续」。");
     }
 
     private CraftingTasks.TaskResult TickSelectRetainer()
     {
-        if (_retainerVisitIndex >= _retainersToVisit.Count)
+        if (_retainerVisitIndex >= _retainersToVisit.Count || FailureReason != null)
         {
             _phase = Phase.CloseRetainerList;
             return CraftingTasks.TaskResult.Retry;
@@ -368,8 +328,7 @@ internal unsafe class RetainerTaskExecutor
 
         if (!GenericHelpers.TryGetAddonByName<AtkUnitBase>("RetainerList", out var addon) || !addon->IsVisible)
         {
-            Delay(150);
-            return CraftingTasks.TaskResult.Retry;
+            return RetryAddon("雇员名单未就绪。请结束当前雇员操作后点击「继续」。");
         }
 
         var entry = _retainersToVisit[_retainerVisitIndex];
@@ -395,20 +354,10 @@ internal unsafe class RetainerTaskExecutor
         {
             GatherBuddy.Log.Debug("[RetainerTaskExecutor] Dismissing Talk dialog before retainer menu");
             new AddonMaster.Talk((nint)talk).Click();
-            Delay(300);
-            return CraftingTasks.TaskResult.Retry;
+            return RetryAddon("未能打开雇员菜单。请结束当前雇员操作后点击「继续」。", 300);
         }
 
-        _addonRetryCount++;
-        if (_addonRetryCount > MaxAddonRetries)
-        {
-            GatherBuddy.Log.Warning("[RetainerTaskExecutor] Timed out waiting for retainer SelectString");
-            _phase = Phase.Aborted;
-            return CraftingTasks.TaskResult.Done;
-        }
-
-        Delay(150);
-        return CraftingTasks.TaskResult.Retry;
+        return RetryAddon("未能打开雇员菜单。请结束当前雇员操作后点击「继续」。");
     }
 
     private CraftingTasks.TaskResult TickSelectEntrustWithdraw()
@@ -416,15 +365,13 @@ internal unsafe class RetainerTaskExecutor
         if (!GenericHelpers.TryGetAddonByName<AddonSelectString>("SelectString", out var menu) ||
             !menu->AtkUnitBase.IsVisible)
         {
-            Delay(150);
-            return CraftingTasks.TaskResult.Retry;
+            return RetryAddon("未能打开雇员菜单。请结束当前雇员操作后点击「继续」。");
         }
 
         var entryCount = menu->PopupMenu.PopupMenu.EntryCount;
         if (entryCount == 0)
         {
-            Delay(100);
-            return CraftingTasks.TaskResult.Retry;
+            return RetryAddon("雇员菜单尚未加载。请结束当前雇员操作后点击「继续」。");
         }
 
         new AddonMaster.SelectString((nint)menu).Entries[0].Select();
@@ -436,13 +383,19 @@ internal unsafe class RetainerTaskExecutor
 
     private CraftingTasks.TaskResult TickWaitInventory()
     {
-        var agentRetainer = AgentModule.Instance()->GetAgentByInternalId(AgentId.Retainer);
-        if (agentRetainer != null && agentRetainer->IsAgentActive())
+        var entry = _retainersToVisit[_retainerVisitIndex];
+        if (_verifyOnly ? _inventory.TryReadOpenedRetainer(entry.Id) : VulcanRetainerInventory.GetOpenedInventory(entry.Id, requireAllPages: true) != null)
         {
-            var entry = _retainersToVisit[_retainerVisitIndex];
-            _currentRetainerItems = BuildItemListForRetainer(entry.RetainerId);
-            _currentItemIndex = 0;
             _addonRetryCount = 0;
+            if (_closeRequested || _verifyOnly)
+            {
+                _phase = Phase.CloseRetainerInventory;
+                return CraftingTasks.TaskResult.Retry;
+            }
+
+            _openedInventory = true;
+            _currentRetainerItems = BuildItemListForRetainer(entry.Id);
+            _currentItemIndex = 0;
             _phase = Phase.WithdrawNextItem;
             Delay(500);
             return CraftingTasks.TaskResult.Retry;
@@ -451,7 +404,8 @@ internal unsafe class RetainerTaskExecutor
         _addonRetryCount++;
         if (_addonRetryCount > MaxAddonRetries)
         {
-            GatherBuddy.Log.Warning("[RetainerTaskExecutor] Timed out waiting for retainer inventory agent");
+            FailureReason = "游戏未能加载雇员物品栏。请点击「继续」重新核实库存。";
+            _inventory.Invalidate(entry.Id);
             _phase = Phase.CloseRetainerInventory;
             return CraftingTasks.TaskResult.Retry;
         }
@@ -496,13 +450,7 @@ internal unsafe class RetainerTaskExecutor
         var target = _currentRetainerItems[_currentItemIndex];
         var itemId = target.ItemId;
 
-        var inventories = new[]
-        {
-            InventoryType.RetainerPage1, InventoryType.RetainerPage2, InventoryType.RetainerPage3,
-            InventoryType.RetainerPage4, InventoryType.RetainerPage5, InventoryType.RetainerPage6,
-            InventoryType.RetainerPage7, InventoryType.RetainerCrystals
-        };
-        var inventoryManager = InventoryManager.Instance();
+        var inventoryManager = VulcanRetainerInventory.GetOpenedInventory(_retainersToVisit[_retainerVisitIndex].Id);
         if (inventoryManager == null)
         {
             GatherBuddy.Log.Warning("[RetainerTaskExecutor] 搜索雇员物品栏时 InventoryManager 不可用");
@@ -510,10 +458,10 @@ internal unsafe class RetainerTaskExecutor
             return CraftingTasks.TaskResult.Retry;
         }
 
-        foreach (var inv in inventories)
+        foreach (var inv in VulcanRetainerInventory.Containers)
         {
             var container = inventoryManager->GetInventoryContainer(inv);
-            if (container == null)
+            if (container == null || !container->IsLoaded)
             {
                 continue;
             }
@@ -521,7 +469,7 @@ internal unsafe class RetainerTaskExecutor
             for (var i = 0; i < container->Size; i++)
             {
                 var slot = container->GetInventorySlot(i);
-                if (slot == null || slot->ItemId != itemId)
+                if (slot == null || slot->ItemId != itemId || slot->Quantity <= 0 || (slot->Flags & InventoryItem.ItemFlags.Collectable) != 0)
                 {
                     continue;
                 }
@@ -575,6 +523,11 @@ internal unsafe class RetainerTaskExecutor
 
         var target = _currentRetainerItems[_currentItemIndex];
         var wantQty = _lookingForHQ ? target.RemainingHQ : target.RemainingNQ;
+        if (ReadFoundSlotQuantity(target.ItemId) != _foundSlotQty)
+        {
+            _phase = Phase.FindItemSlot;
+            return CraftingTasks.TaskResult.Retry;
+        }
 
         if (_foundSlotRequiresQuantityInput)
         {
@@ -596,16 +549,7 @@ internal unsafe class RetainerTaskExecutor
             return HandleRetrieveDispatchFailure("全部取回");
         }
 
-        if (_lookingForHQ)
-        {
-            target.RemainingHQ -= _foundSlotQty;
-        }
-        else
-        {
-            target.RemainingNQ -= _foundSlotQty;
-        }
-
-        _currentRetainerItems[_currentItemIndex] = target;
+        _requestedQuantity = _foundSlotQty;
         _addonRetryCount = 0;
         _phase = Phase.WaitWithdrawComplete;
         Delay(300);
@@ -625,9 +569,7 @@ internal unsafe class RetainerTaskExecutor
         {
             var target = _currentRetainerItems[_currentItemIndex];
             GatherBuddy.Log.Warning($"[RetainerTaskExecutor] 从 {_foundSlotInventory} 的栏位 {_foundSlotIndex} 按数量取回物品 {target.ItemId} 后, InputNumeric 未出现");
-            _currentItemIndex++;
-            _phase = Phase.WithdrawNextItem;
-            return CraftingTasks.TaskResult.Retry;
+            return FailAndCloseInventory("游戏未打开取回数量窗口。请点击「继续」重新计算缺口。");
         }
 
         Delay(100);
@@ -640,29 +582,31 @@ internal unsafe class RetainerTaskExecutor
         {
             var failedTarget = _currentRetainerItems[_currentItemIndex];
             GatherBuddy.Log.Warning($"[RetainerTaskExecutor] 输入物品 {failedTarget.ItemId} 的取回数量前 InputNumeric 已关闭");
-            _currentItemIndex++;
-            _phase = Phase.WithdrawNextItem;
+            return FailAndCloseInventory("取回数量窗口已关闭。请点击「继续」重新计算缺口。");
+        }
+
+        if (_closeRequested)
+        {
+            input->Close(true);
+            _phase = Phase.WaitWithdrawComplete;
+            Delay(150);
             return CraftingTasks.TaskResult.Retry;
         }
 
         var target = _currentRetainerItems[_currentItemIndex];
         var wantQty = _lookingForHQ ? target.RemainingHQ : target.RemainingNQ;
         var value = Math.Min(wantQty, _foundSlotQty);
+        if (ReadFoundSlotQuantity(target.ItemId) != _foundSlotQty)
+        {
+            input->Close(true);
+            return FailAndCloseInventory("雇员栏位已变化。请点击「继续」重新计算缺口。");
+        }
 
         GatherBuddy.Log.Debug($"[RetainerTaskExecutor] Inputting quantity {value} (want={wantQty}, slot={_foundSlotQty})");
         Callback.Fire(input, true, value);
 
-        if (_lookingForHQ)
-        {
-            target.RemainingHQ -= value;
-        }
-        else
-        {
-            target.RemainingNQ -= value;
-        }
-
-        _currentRetainerItems[_currentItemIndex] = target;
-
+        _requestedQuantity = value;
+        _addonRetryCount = 0;
         _phase = Phase.WaitWithdrawComplete;
         Delay(400);
         return CraftingTasks.TaskResult.Retry;
@@ -672,11 +616,51 @@ internal unsafe class RetainerTaskExecutor
     {
         if (GenericHelpers.TryGetAddonByName<AtkUnitBase>("InputNumeric", out var input) && input->IsVisible)
         {
+            if (++_addonRetryCount > 20)
+            {
+                input->Close(true);
+                return FailAndCloseInventory("取回数量未确认。请检查背包空间后点击「继续」。");
+            }
+
             Delay(100);
             return CraftingTasks.TaskResult.Retry;
         }
 
+        if (_requestedQuantity == 0 && _closeRequested)
+        {
+            _phase = Phase.CloseRetainerInventory;
+            return CraftingTasks.TaskResult.Retry;
+        }
+
         var target = _currentRetainerItems[_currentItemIndex];
+        var remainingInSlot = ReadFoundSlotQuantity(target.ItemId);
+        if (remainingInSlot < 0 || _foundSlotQty - remainingInSlot < _requestedQuantity)
+        {
+            if (++_addonRetryCount > 20)
+            {
+                return FailAndCloseInventory("游戏未确认取回材料。请检查背包空间后点击「继续」。");
+            }
+
+            Delay(150);
+            return CraftingTasks.TaskResult.Retry;
+        }
+
+        if (_lookingForHQ)
+        {
+            target.RemainingHQ -= _requestedQuantity;
+        }
+        else
+        {
+            target.RemainingNQ -= _requestedQuantity;
+        }
+
+        _requestedQuantity = 0;
+        _currentRetainerItems[_currentItemIndex] = target;
+        if (_closeRequested)
+        {
+            _phase = Phase.CloseRetainerInventory;
+            return CraftingTasks.TaskResult.Retry;
+        }
 
         if (_lookingForHQ && target.RemainingHQ > 0)
         {
@@ -713,6 +697,21 @@ internal unsafe class RetainerTaskExecutor
         return CraftingTasks.TaskResult.Retry;
     }
 
+    private int ReadFoundSlotQuantity(uint itemId)
+    {
+        var inventory = VulcanRetainerInventory.GetOpenedInventory(_retainersToVisit[_retainerVisitIndex].Id);
+        var container = inventory == null ? null : inventory->GetInventoryContainer(_foundSlotInventory);
+        if (container == null || !container->IsLoaded || _foundSlotIndex >= (uint)container->Size)
+        {
+            return -1;
+        }
+
+        var slot = container->GetInventorySlot((int)_foundSlotIndex);
+        return slot != null && slot->ItemId == itemId && (slot->Flags & InventoryItem.ItemFlags.Collectable) == 0
+            && slot->Flags.HasFlag(InventoryItem.ItemFlags.HighQuality) == _lookingForHQ
+            ? (int)slot->Quantity : 0;
+    }
+
     private CraftingTasks.TaskResult HandleRetrieveDispatchFailure(string commandName)
     {
         var target = _currentItemIndex < _currentRetainerItems.Count
@@ -720,8 +719,13 @@ internal unsafe class RetainerTaskExecutor
             : default;
         GatherBuddy.Log.Warning($"[RetainerTaskExecutor] 从 {_foundSlotInventory} 的栏位 {_foundSlotIndex} 为物品 {target.ItemId} 分派{commandName}命令失败, 正在关闭当前雇员物品栏");
         ClearFoundSlot();
+        return FailAndCloseInventory("未能取回雇员材料。请点击「继续」重新计算缺口。");
+    }
+
+    private CraftingTasks.TaskResult FailAndCloseInventory(string reason)
+    {
+        FailureReason = reason;
         _phase = Phase.CloseRetainerInventory;
-        Delay(150);
         return CraftingTasks.TaskResult.Retry;
     }
 
@@ -735,6 +739,17 @@ internal unsafe class RetainerTaskExecutor
 
     private CraftingTasks.TaskResult TickCloseRetainerInventory()
     {
+        if (_openedInventory)
+        {
+            _openedInventory = false;
+            var retainerId = _retainersToVisit[_retainerVisitIndex].Id;
+            if (!_inventory.TryReadOpenedRetainer(retainerId))
+            {
+                _inventory.Invalidate(retainerId);
+                FailureReason ??= "无法确认取回后的雇员库存。请点击「继续」重新核实。";
+            }
+        }
+
         var agentModule = AgentModule.Instance();
         if (agentModule == null)
         { _phase = Phase.SelectQuit; return CraftingTasks.TaskResult.Retry; }
@@ -783,23 +798,13 @@ internal unsafe class RetainerTaskExecutor
         if (!GenericHelpers.TryGetAddonByName<AddonSelectString>("SelectString", out var menu) ||
             !menu->AtkUnitBase.IsVisible)
         {
-            _addonRetryCount++;
-            if (_addonRetryCount > 20)
-            {
-                GatherBuddy.Log.Warning("[RetainerTaskExecutor] SelectString not available for Quit, advancing to next retainer");
-                _retainerVisitIndex++;
-                _phase = Phase.SelectRetainer;
-                _addonRetryCount = 0;
-                return CraftingTasks.TaskResult.Retry;
-            }
-            Delay(150);
-            return CraftingTasks.TaskResult.Retry;
+            return RetryAddon("无法关闭雇员菜单。请退出传唤铃后点击「继续」。");
         }
 
         var quitText = GetAddonText(2383);
         var entryCount = menu->PopupMenu.PopupMenu.EntryCount;
 
-        for (var i = 0; i < entryCount; i++)
+        for (var i = 0; quitText.Length > 0 && i < entryCount; i++)
         {
             var label = MemoryHelper.ReadSeStringNullTerminated((nint)menu->PopupMenu.PopupMenu.EntryNames[i].Value).TextValue;
             if (!label.Contains(quitText, StringComparison.OrdinalIgnoreCase))
@@ -815,11 +820,7 @@ internal unsafe class RetainerTaskExecutor
             return CraftingTasks.TaskResult.Retry;
         }
 
-        GatherBuddy.Log.Warning("[RetainerTaskExecutor] Could not find 'Quit' in retainer menu, advancing anyway");
-        _retainerVisitIndex++;
-        _phase = Phase.SelectRetainer;
-        _addonRetryCount = 0;
-        return CraftingTasks.TaskResult.Retry;
+        return RetryAddon("找不到雇员菜单的退出选项。请退出传唤铃后点击「继续」。");
     }
 
     private CraftingTasks.TaskResult TickWaitQuit()
@@ -828,8 +829,7 @@ internal unsafe class RetainerTaskExecutor
         {
             GatherBuddy.Log.Debug("[RetainerTaskExecutor] Dismissing Talk dialog after Quit");
             new AddonMaster.Talk((nint)talk).Click();
-            Delay(300);
-            return CraftingTasks.TaskResult.Retry;
+            return RetryAddon("无法结束雇员对话。请退出传唤铃后点击「继续」。", 300);
         }
 
         if (!GenericHelpers.TryGetAddonByName<AddonSelectString>("SelectString", out var menu) ||
@@ -841,17 +841,7 @@ internal unsafe class RetainerTaskExecutor
             return CraftingTasks.TaskResult.Retry;
         }
 
-        _addonRetryCount++;
-        if (_addonRetryCount > 20)
-        {
-            GatherBuddy.Log.Warning("[RetainerTaskExecutor] Retainer menu did not close after Quit");
-            _phase = Phase.SelectRetainer;
-            _addonRetryCount = 0;
-            return CraftingTasks.TaskResult.Retry;
-        }
-
-        Delay(150);
-        return CraftingTasks.TaskResult.Retry;
+        return RetryAddon("无法结束雇员对话。请退出传唤铃后点击「继续」。");
     }
 
     private CraftingTasks.TaskResult TickCloseRetainerList()
@@ -860,23 +850,14 @@ internal unsafe class RetainerTaskExecutor
         {
             GatherBuddy.Log.Debug("[RetainerTaskExecutor] Dismissing Talk dialog before closing RetainerList");
             new AddonMaster.Talk((nint)talk).Click();
-            Delay(300);
-            return CraftingTasks.TaskResult.Retry;
+            return RetryAddon("无法退出传唤铃。请结束当前雇员操作后点击「继续」。", 300);
         }
 
         if (!GenericHelpers.TryGetAddonByName<AtkUnitBase>("RetainerList", out var addon) || !addon->IsVisible)
         {
             if (Dalamud.Conditions[ConditionFlag.OccupiedSummoningBell])
             {
-                _addonRetryCount++;
-                if (_addonRetryCount > MaxAddonRetries)
-                {
-                    GatherBuddy.Log.Warning("[RetainerTaskExecutor] Still at bell but RetainerList never appeared, marking complete");
-                    _phase = Phase.Complete;
-                    return CraftingTasks.TaskResult.Done;
-                }
-                Delay(150);
-                return CraftingTasks.TaskResult.Retry;
+                return RetryAddon("无法退出传唤铃。请结束当前雇员操作后点击「继续」。");
             }
 
             _phase = Phase.Complete;
@@ -895,26 +876,16 @@ internal unsafe class RetainerTaskExecutor
         if (GenericHelpers.TryGetAddonByName<AddonTalk>("Talk", out var talk) && talk->AtkUnitBase.IsVisible)
         {
             new AddonMaster.Talk((nint)talk).Click();
-            Delay(300);
-            return CraftingTasks.TaskResult.Retry;
+            return RetryAddon("无法退出传唤铃。请结束当前雇员操作后点击「继续」。", 300);
         }
 
-        if (!GenericHelpers.TryGetAddonByName<AtkUnitBase>("RetainerList", out var addon) || !addon->IsVisible)
+        if (!Dalamud.Conditions[ConditionFlag.OccupiedSummoningBell])
         {
             _phase = Phase.Complete;
             return CraftingTasks.TaskResult.Done;
         }
 
-        _addonRetryCount++;
-        if (_addonRetryCount > 20)
-        {
-            GatherBuddy.Log.Warning("[RetainerTaskExecutor] RetainerList did not close, marking complete anyway");
-            _phase = Phase.Complete;
-            return CraftingTasks.TaskResult.Done;
-        }
-
-        Delay(150);
-        return CraftingTasks.TaskResult.Retry;
+        return RetryAddon("无法退出传唤铃。请结束当前雇员操作后点击「继续」。");
     }
 
     private List<WithdrawTarget> BuildItemListForRetainer(ulong retainerId)
@@ -935,34 +906,6 @@ internal unsafe class RetainerTaskExecutor
 
         GatherBuddy.Log.Debug($"[RetainerTaskExecutor] Built item list for retainer {retainerId}: {list.Count} item(s)");
         return list;
-    }
-
-    private static HashSet<ulong> GetRetainerIdsFromManager()
-    {
-        var retainerIds = new HashSet<ulong>();
-        var retainerMgr = RetainerManager.Instance();
-        if (retainerMgr == null)
-        {
-            return retainerIds;
-        }
-
-        for (uint i = 0; i < retainerMgr->GetRetainerCount(); i++)
-        {
-            var retainer = retainerMgr->GetRetainerBySortedIndex(i);
-            if (retainer == null || retainer->RetainerId == 0)
-            {
-                continue;
-            }
-
-            retainerIds.Add(retainer->RetainerId);
-        }
-
-        if (retainerIds.Count > 0)
-        {
-            GatherBuddy.Log.Debug($"[RetainerTaskExecutor] Falling back to RetainerManager ids for {retainerIds.Count} retainer(s)");
-        }
-
-        return retainerIds;
     }
 
     public static IGameObject? FindNearestBellForNavigation()
@@ -1081,6 +1024,23 @@ internal unsafe class RetainerTaskExecutor
         _nextRetry = DateTime.Now.AddMilliseconds(ms);
     }
 
+    private CraftingTasks.TaskResult RetryAddon(string reason, int delay = 150)
+    {
+        if (++_addonRetryCount > MaxAddonRetries)
+        {
+            return Abort(reason);
+        }
+
+        Delay(delay);
+        return CraftingTasks.TaskResult.Retry;
+    }
+
+    private CraftingTasks.TaskResult Abort(string reason)
+    {
+        FailureReason ??= reason;
+        _phase = Phase.Aborted;
+        return CraftingTasks.TaskResult.Done;
+    }
 
     internal static Dictionary<uint, IngredientQualityDemand> ComputeQualityTargets(
         Dictionary<uint, int> materials,

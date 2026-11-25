@@ -19,7 +19,12 @@ public sealed class CraftingListPlan
 public readonly record struct CraftingListPlannerOptions(
     bool UseRetainerCraftableAvailability = false,
     bool ConsumeIntermediateAvailability = true,
-    bool ConsumeFinalAvailability = true);
+    bool ConsumeFinalAvailability = true,
+    IReadOnlyDictionary<uint, int>? FinalItemTargets = null,
+    bool CountFinalRetainerStock = false)
+{
+    internal VulcanRetainerInventory? RetainerInventory { get; init; }
+}
 
 public static class CraftingListPlanner
 {
@@ -34,7 +39,9 @@ public static class CraftingListPlanner
         private readonly bool _useRetainers;
         private readonly bool _consumeIntermediateAvailability;
         private readonly bool _consumeFinalAvailability;
+        private readonly bool _countFinalRetainerStock;
         private readonly Dictionary<uint, CraftingListItem> _originalRecipeLookup;
+        private readonly IReadOnlyDictionary<uint, int>? _finalItemTargets;
 
         public Planner(CraftingListDefinition list, CraftingListPlannerOptions options)
         {
@@ -42,7 +49,9 @@ public static class CraftingListPlanner
             _useRetainers = options.UseRetainerCraftableAvailability;
             _consumeIntermediateAvailability = options.ConsumeIntermediateAvailability;
             _consumeFinalAvailability = options.ConsumeFinalAvailability;
-            _availability = new AvailabilityLedger(_useRetainers);
+            _countFinalRetainerStock = options.CountFinalRetainerStock;
+            _finalItemTargets = options.FinalItemTargets;
+            _availability = new AvailabilityLedger(_useRetainers || _countFinalRetainerStock, options.RetainerInventory);
             _originalRecipeLookup = list.Recipes
                 .GroupBy(item => item.RecipeId)
                 .ToDictionary(group => group.Key, group => group.First());
@@ -126,8 +135,13 @@ public static class CraftingListPlanner
         private void PlanOriginalRecipe(CraftingListItem item, Recipe recipe)
         {
             var resultItemId = recipe.ItemResult.RowId;
-            var requestedItemCount = item.Quantity * (int)recipe.AmountResult;
+            var requestedItemCount = _finalItemTargets != null && _finalItemTargets.TryGetValue(item.RecipeId, out var target)
+                ? target : item.Quantity * (int)recipe.AmountResult;
             var remainingItemCount = requestedItemCount;
+            if (remainingItemCount <= 0)
+            {
+                return;
+            }
 
             remainingItemCount -= _availability.ConsumePlanned(resultItemId, remainingItemCount);
 
@@ -136,14 +150,14 @@ public static class CraftingListPlanner
                 var consumedInventory = _availability.ConsumeInventory(resultItemId, remainingItemCount);
                 remainingItemCount -= consumedInventory;
                 var consumedRetainers = 0;
-                if (_useRetainers)
+                if (_useRetainers || _countFinalRetainerStock)
                 {
                     consumedRetainers = _availability.ConsumeRetainers(resultItemId, remainingItemCount);
                     remainingItemCount -= consumedRetainers;
                 }
 
 
-                if (consumedRetainers > 0)
+                if (!_countFinalRetainerStock && consumedRetainers > 0)
                 {
                     AddCount(_plan.RetainerConsumedCraftables, resultItemId, consumedRetainers);
                 }
@@ -289,13 +303,15 @@ public static class CraftingListPlanner
     private sealed class AvailabilityLedger
     {
         private readonly bool _useRetainers;
+        private readonly VulcanRetainerInventory? _retainerInventory;
         private readonly Dictionary<uint, PlannedAvailability> _plannedAvailable = [];
         private readonly Dictionary<uint, (int NQ, int HQ)> _inventoryAvailable = [];
         private readonly Dictionary<uint, (int NQ, int HQ)> _retainerAvailable = [];
 
-        public AvailabilityLedger(bool useRetainers)
+        public AvailabilityLedger(bool useRetainers, VulcanRetainerInventory? retainerInventory)
         {
             _useRetainers = useRetainers;
+            _retainerInventory = useRetainers ? retainerInventory ?? VulcanRetainerPreview.GetVerifiedInventory() : null;
         }
 
         public int ConsumePlanned(uint itemId, int requested)
@@ -464,17 +480,7 @@ public static class CraftingListPlanner
             }
         }
 
-        private static (int NQ, int HQ) GetRetainerSplitCounts(uint itemId)
-        {
-            try
-            {
-                var snapshot = RetainerItemQuery.CreateSnapshot(new[] { itemId });
-                return (snapshot.GetCountNQ(itemId), snapshot.GetCountHQ(itemId));
-            }
-            catch
-            {
-                return (0, 0);
-            }
-        }
+        private (int NQ, int HQ) GetRetainerSplitCounts(uint itemId)
+            => _retainerInventory?.GetCounts(itemId) ?? default;
     }
 }

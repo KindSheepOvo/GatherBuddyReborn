@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using Functions = GatherBuddy.Plugin.Functions;
 
@@ -37,6 +38,7 @@ public partial class AutoGatherListsManager : IDisposable
     private readonly List<(IGatherable Item, uint Quantity)> _activeItems = [];
     private readonly List<(IGatherable Item, uint Quantity)> _fallbackItems = [];
     private readonly HashSet<IGatherable> _localInventoryActiveItems = [];
+    private AutoGatherList? _craftingGatherList;
     public static ManualOrderSortMode SortMode { get; } = new();
 
     public FileSystem<AutoGatherList> FileSystem
@@ -127,6 +129,12 @@ public partial class AutoGatherListsManager : IDisposable
     public void Dispose()
     { }
 
+    internal void SetCraftingGatherList(AutoGatherList? list)
+    {
+        _craftingGatherList = list;
+        SetActiveItems();
+    }
+
     public void SetActiveItems(bool removeCompletedItems = false)
     {
         if (removeCompletedItems && RemoveCompletedItemsFromEnabledLists())
@@ -139,13 +147,17 @@ public partial class AutoGatherListsManager : IDisposable
         _localInventoryActiveItems.Clear();
 
         var totals = new Dictionary<(IGatherable Item, bool Fallback), (long Quantity, bool UsesRetainerInventory)>();
-        foreach (var path in _fileSystem.Root.GetAllDescendants(SortMode))
+        var lists = _fileSystem.Root.GetAllDescendants(SortMode)
+            .OfType<FileSystem<AutoGatherList>.Leaf>()
+            .Select(leaf => leaf.Value)
+            .Where(list => list.Enabled && (_craftingGatherList == null || list.Fallback));
+        if (_craftingGatherList != null)
         {
-            if (path is not FileSystem<AutoGatherList>.Leaf { Value: { Enabled: true } list })
-            {
-                continue;
-            }
+            lists = lists.Prepend(_craftingGatherList);
+        }
 
+        foreach (var list in lists)
+        {
             foreach (var listItem in list.Items)
             {
                 var listQuantity = list.Quantities[listItem];

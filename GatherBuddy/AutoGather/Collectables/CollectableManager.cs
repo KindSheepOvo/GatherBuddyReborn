@@ -45,6 +45,7 @@ public unsafe class CollectableManager : IDisposable
 
     public event Action? OnFinishCollecting;
     public event Action<string>? OnError;
+    internal event Action? VulcanTurnInStopped;
 
     public bool IsRunning { get; private set; }
     public string StatusText { get; private set; } = "空闲";
@@ -158,9 +159,14 @@ public unsafe class CollectableManager : IDisposable
             return;
         }
 
+        var notifyVulcan = IsRunning && CurrentRunSource == CollectableRunSource.VulcanQueue;
         GatherBuddy.Log.Information("[收藏品管理器] 正在停止收藏品交付");
         CleanupCurrentRun(stopActivePurchaseList: true);
         StatusText = "收藏品交付已停止。";
+        if (notifyVulcan)
+        {
+            VulcanTurnInStopped?.Invoke();
+        }
     }
 
     public void ClearStatus()

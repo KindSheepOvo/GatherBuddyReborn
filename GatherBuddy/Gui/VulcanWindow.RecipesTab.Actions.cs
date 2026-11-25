@@ -1,6 +1,5 @@
 ﻿using FFXIVClientStructs.FFXIV.Client.UI.Misc;
 using GatherBuddy.Crafting;
-using GatherBuddy.Plugin;
 using Lumina.Excel.Sheets;
 using System;
 
@@ -183,73 +182,18 @@ public partial class VulcanWindow
         return false;
     }
 
-    private static void StartBrowserQuickSynth(Recipe recipe, int quantity)
+    private static bool StartBrowserQuickSynth(Recipe recipe, int quantity)
     {
         var settings = GatherBuddy.RecipeBrowserSettings.Get(recipe.RowId);
-        var retainerRestock = _browserRetainerRestock && AllaganTools.Enabled;
-        var executionPlan = CreateBrowserExecutionPlan(recipe, quantity, settings, true, retainerRestock);
-        GatherBuddy.Log.Information($"[VulcanWindow] Browser quick synth: {recipe.ItemResult.Value.Name.ExtractText()} x{quantity}");
-        CraftingGatherBridge.StartQueueCraftAndGather(executionPlan);
+        return CraftingGatherBridge.StartRecipeBrowserCraft(recipe.RowId, recipe.ItemResult.Value.Name.ExtractText(), quantity,
+            quickSynth: true, _browserRetainerRestock, settings);
     }
 
-    private static void StartBrowserCraft(Recipe recipe, int quantity)
+    private static bool StartBrowserCraft(Recipe recipe, int quantity)
     {
         var settings = GatherBuddy.RecipeBrowserSettings.Get(recipe.RowId);
-        RecipeCraftSettings? craftSettings = null;
-        if (settings != null && settings.HasAnySettings())
-        {
-            craftSettings = new RecipeCraftSettings
-            {
-                FoodMode = settings.FoodMode,
-                FoodItemId = settings.FoodItemId,
-                FoodHQ = settings.FoodHQ,
-                MedicineMode = settings.MedicineMode,
-                MedicineItemId = settings.MedicineItemId,
-                MedicineHQ = settings.MedicineHQ,
-                ManualMode = settings.ManualMode,
-                ManualItemId = settings.ManualItemId,
-                SquadronManualMode = settings.SquadronManualMode,
-                SquadronManualItemId = settings.SquadronManualItemId,
-                UseAllNQ = settings.UseAllNQ,
-                SelectedMacroId = settings.SelectedMacroId,
-                MacroMode = settings.MacroMode,
-                SolverOverride = settings.SolverOverride,
-                IngredientPreferences = [with(settings.IngredientPreferences)],
-            };
-        }
-
-        var retainerRestock = _browserRetainerRestock && AllaganTools.Enabled;
-        var executionPlan = CreateBrowserExecutionPlan(recipe, quantity, craftSettings, false, retainerRestock);
-
-        GatherBuddy.Log.Information($"[VulcanWindow] Browser craft: {recipe.ItemResult.Value.Name.ExtractText()} x{quantity}");
-        CraftingGatherBridge.StartQueueCraftAndGather(executionPlan);
-    }
-
-    private static CraftingExecutionPlan CreateBrowserExecutionPlan(Recipe recipe, int quantity, RecipeCraftSettings? craftSettings, bool nqOnly, bool retainerRestock)
-    {
-        var list = new CraftingListDefinition
-        {
-            ID = -1,
-            Name = recipe.ItemResult.Value.Name.ExtractText(),
-            SkipIfEnough = true,
-            SkipFinalIfEnough = false,
-            RetainerRestock = retainerRestock,
-        };
-
-        list.Recipes.Add(new CraftingListItem(recipe.RowId, quantity)
-        {
-            IsOriginalRecipe = true,
-            CraftSettings = craftSettings?.Clone(),
-            Options = new ListItemOptions
-            {
-                NQOnly = nqOnly,
-            },
-        });
-
-        var executionPlan = CraftingExecutionPlan.Create(list);
-        GatherBuddy.Log.Debug(
-            $"[VulcanWindow] Browser execution plan for recipe {recipe.RowId}: quantity={quantity}, nqOnly={nqOnly}, queue={executionPlan.QueueView.Count}, materials={executionPlan.MaterialsView.Count}, precrafts={executionPlan.PrecraftsView.Count}, skipIfEnough={executionPlan.SkipIfEnough}, skipFinalIfEnough={executionPlan.SkipFinalIfEnough}");
-        return executionPlan;
+        return CraftingGatherBridge.StartRecipeBrowserCraft(recipe.RowId, recipe.ItemResult.Value.Name.ExtractText(), quantity,
+            quickSynth: false, _browserRetainerRestock, settings?.HasAnySettings() == true ? settings : null);
     }
 
 }

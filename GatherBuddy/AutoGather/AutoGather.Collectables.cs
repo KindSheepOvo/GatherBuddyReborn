@@ -3,6 +3,7 @@ using GatherBuddy.AutoGather.AtkReaders;
 using GatherBuddy.AutoGather.Collectables;
 using GatherBuddy.AutoGather.Extensions;
 using GatherBuddy.Classes;
+using GatherBuddy.Crafting;
 using GatherBuddy.Helpers;
 using System;
 using System.Text.RegularExpressions;
@@ -15,7 +16,7 @@ namespace GatherBuddy.AutoGather
 
         private static unsafe bool HasCollectables()
         {
-            if (!GatherBuddy.Config.CollectableConfig.AutoTurnInCollectables
+            if (CraftingGatherBridge.IsGatheringForStockRun || !GatherBuddy.Config.CollectableConfig.AutoTurnInCollectables
              || !CollectableTurnInRequirements.IsAvailable)
             {
                 return false;

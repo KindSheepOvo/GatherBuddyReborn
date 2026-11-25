@@ -410,6 +410,8 @@ namespace GatherBuddy.AutoGather
             }
         } = false;
 
+        internal event Action<bool>? EnabledChanged;
+
         public unsafe bool Enabled
         {
             get => _enabled;
@@ -479,7 +481,9 @@ namespace GatherBuddy.AutoGather
                         GatherBuddy.CollectableManager?.Stop();
                     }
 
-                    if (Crafting.CraftingGatherBridge.GetTemporaryGatherList() != null && !Crafting.CraftingGatherBridge.PreserveListOnDisable)
+                    if (Crafting.CraftingGatherBridge.GetTemporaryGatherList() != null
+                        && !Crafting.CraftingGatherBridge.IsGatheringForStockRun
+                        && !Crafting.CraftingGatherBridge.PreserveListOnDisable)
                     {
                         GatherBuddy.Log.Debug("[AutoGather] 正在清理临时 Vulcan 采集列表 (用户禁用了自动采集)");
                         Crafting.CraftingGatherBridge.DeleteTemporaryGatherList();
@@ -505,6 +509,7 @@ namespace GatherBuddy.AutoGather
                 }
 
                 _enabled = value;
+                EnabledChanged?.Invoke(value);
                 _plugin.Ipc.AutoGatherEnabledChanged(value);
             }
         }

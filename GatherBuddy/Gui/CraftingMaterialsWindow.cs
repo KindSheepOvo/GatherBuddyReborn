@@ -65,7 +65,6 @@ public class CraftingMaterialsWindow : M3PanelWindow
 
     private enum RetainerColumnMode
     {
-        None,
         Total,
         Split,
     }
@@ -73,8 +72,8 @@ public class CraftingMaterialsWindow : M3PanelWindow
     private readonly record struct MaterialEntry(
         uint ItemId,
         int Have,
-        int RetNQ,
-        int RetHQ,
+        int? RetNQ,
+        int? RetHQ,
         int Needed,
         int EffectiveAvailable,
         string Name,
@@ -116,7 +115,7 @@ public class CraftingMaterialsWindow : M3PanelWindow
     private bool _cachedMaterialViewShowPrecrafts;
     private bool _cachedMaterialViewPreferVendors;
     private bool _cachedMaterialViewKeepFulfilled;
-    private bool _cachedMaterialViewShowRetainer;
+    private int _cachedRetainerRevision;
     private bool _cachedMobDropInfoInitialized;
     private List<MaterialPanel> _cachedPanels = [];
 
@@ -223,10 +222,11 @@ public class CraftingMaterialsWindow : M3PanelWindow
             return;
         }
 
-        var showRetainer = AllaganTools.Enabled;
-        if (ShouldRebuildMaterialView(showRetainer))
+        var retainers = VulcanRetainerPreview.GetVerifiedInventory();
+        var retainerRevision = VulcanRetainerPreview.Revision;
+        if (ShouldRebuildMaterialView(retainerRevision))
         {
-            RebuildMaterialView(showRetainer);
+            RebuildMaterialView(retainers, retainerRevision);
         }
 
         if (!_cachedHasMaterials)
@@ -236,7 +236,7 @@ public class CraftingMaterialsWindow : M3PanelWindow
             return;
         }
 
-        DrawToolbar(showRetainer);
+        DrawToolbar();
         if (!_cachedHasVisibleEntries)
         {
             M3Widgets.EmptyState("##materials_all_ready", "所有材料已备齐",
@@ -261,7 +261,7 @@ public class CraftingMaterialsWindow : M3PanelWindow
         M3Text.Draw(text, M3TextStyle.Muted);
     }
 
-    private void DrawToolbar(bool showRetainer)
+    private void DrawToolbar()
     {
         var flow = new M3Flow();
         FilterChip(ref flow, "##materials_overcap", "超过 100%", FontAwesomeIcon.Percent, ref _matsOvercapPercent,
@@ -273,17 +273,12 @@ public class CraftingMaterialsWindow : M3PanelWindow
         FilterChip(ref flow, "##materials_keep_fulfilled", "保留已满足", FontAwesomeIcon.CheckDouble, ref _matsKeepFulfilled,
             "即使清单已启用「持有足够时跳过」，仍显示已满足的材料。");
 
-        if (showRetainer && _editor != null)
+        const string refreshLabel = "刷新雇员";
+        flow.Next(M3Widgets.ChipWidth(refreshLabel, FontAwesomeIcon.Sync));
+        if (M3Widgets.Chip("##materials_refresh_retainers", refreshLabel, false, FontAwesomeIcon.Sync,
+                VulcanRetainerPreview.InventoryTooltip))
         {
-            const string refreshLabel = "刷新雇员";
-            flow.Next(M3Widgets.ChipWidth(refreshLabel, FontAwesomeIcon.Sync));
-            if (M3Widgets.Chip("##materials_refresh_retainers", refreshLabel, false, FontAwesomeIcon.Sync,
-                    "刷新雇员持有的 NQ 和 HQ 物品数量。"))
-            {
-                _editor.InvalidateRetainerSnapshot();
-                InvalidateMaterialView();
-                M3Snackbar.Show("已刷新雇员库存数量。");
-            }
+            VulcanRetainerPreview.Invalidate();
         }
 
         ImGui.Dummy(new Vector2(0f, M3.Space1));
@@ -336,7 +331,7 @@ public class CraftingMaterialsWindow : M3PanelWindow
         _cachedPanels = [];
     }
 
-    private bool ShouldRebuildMaterialView(bool showRetainer)
+    private bool ShouldRebuildMaterialView(int retainerRevision)
     {
         if (_editor == null)
         {
@@ -356,7 +351,7 @@ public class CraftingMaterialsWindow : M3PanelWindow
         if (_cachedMaterialViewShowPrecrafts != _matsShowPrecrafts
          || _cachedMaterialViewPreferVendors != _matsPreferVendors
          || _cachedMaterialViewKeepFulfilled != _matsKeepFulfilled
-         || _cachedMaterialViewShowRetainer != showRetainer)
+         || _cachedRetainerRevision != retainerRevision)
         {
             return true;
         }
@@ -369,7 +364,7 @@ public class CraftingMaterialsWindow : M3PanelWindow
         return false;
     }
 
-    private void RebuildMaterialView(bool showRetainer)
+    private void RebuildMaterialView(VulcanRetainerInventory? retainers, int retainerRevision)
     {
         if (_editor == null)
         {
@@ -387,34 +382,22 @@ public class CraftingMaterialsWindow : M3PanelWindow
 
             if (!_cachedHasMaterials)
             {
-                UpdateMaterialViewCacheMetadata(showRetainer);
+                UpdateMaterialViewCacheMetadata(retainerRevision);
                 return;
             }
 
             var itemSheet = Dalamud.GameData.GetExcelSheet<Item>();
             if (itemSheet == null)
             {
-                UpdateMaterialViewCacheMetadata(showRetainer);
+                UpdateMaterialViewCacheMetadata(retainerRevision);
                 return;
             }
 
-            var countRetainersTowardNeed = showRetainer && _editor.RetainerRestockEnabled;
+            var countRetainersTowardNeed = retainers != null && _editor.RetainerRestockEnabled;
             var hideSatisfiedRows = _editor.SkipIfEnoughEnabled && !_matsKeepFulfilled;
             var craftMaterials = _matsShowPrecrafts
                 ? _editor.GetDisplayPrecraftMaterials()
                 : null;
-            var retainerSnapshot = RetainerItemSnapshot.Empty;
-            if (showRetainer)
-            {
-                var snapshotItemIds = new List<uint>(materials.Keys);
-                if (craftMaterials != null)
-                {
-                    snapshotItemIds.AddRange(craftMaterials.Keys);
-                }
-
-                retainerSnapshot = _editor.GetRetainerSnapshot(snapshotItemIds);
-            }
-
             var gatherList = new List<MaterialEntry>();
             var dropList = new List<MaterialEntry>();
             var shopList = new List<MaterialEntry>();
@@ -463,7 +446,7 @@ public class CraftingMaterialsWindow : M3PanelWindow
 
             foreach (var (itemId, needed) in materials)
             {
-                if (TryCreateMaterialEntry(itemSheet, itemId, needed, false, retainerSnapshot, countRetainersTowardNeed, out var entry))
+                if (TryCreateMaterialEntry(itemSheet, itemId, needed, false, retainers, countRetainersTowardNeed, out var entry))
                 {
                     AddEntry(entry);
                 }
@@ -473,7 +456,7 @@ public class CraftingMaterialsWindow : M3PanelWindow
             {
                 foreach (var (itemId, needed) in craftMaterials)
                 {
-                    if (TryCreateMaterialEntry(itemSheet, itemId, needed, true, retainerSnapshot, countRetainersTowardNeed, out var entry))
+                    if (TryCreateMaterialEntry(itemSheet, itemId, needed, true, retainers, countRetainersTowardNeed, out var entry))
                     {
                         AddEntry(entry);
                     }
@@ -489,8 +472,7 @@ public class CraftingMaterialsWindow : M3PanelWindow
                 SortEntries(craftList);
             }
 
-            var nonCraftRetainerMode = showRetainer ? RetainerColumnMode.Total : RetainerColumnMode.None;
-            var craftRetainerMode = showRetainer ? RetainerColumnMode.Split : RetainerColumnMode.None;
+            const RetainerColumnMode nonCraftRetainerMode = RetainerColumnMode.Total;
             if (gatherList.Count > 0)
             {
                 _cachedPanels.Add(new MaterialPanel("##gather", "采集", FontAwesomeIcon.Leaf, HueGather, gatherList, CountMissing(gatherList),
@@ -518,10 +500,10 @@ public class CraftingMaterialsWindow : M3PanelWindow
             if (craftList is { Count: > 0 })
             {
                 _cachedPanels.Add(new MaterialPanel("##craft", "制作", FontAwesomeIcon.Hammer, HueCraft, craftList, CountMissing(craftList),
-                    craftRetainerMode, null));
+                    RetainerColumnMode.Split, null));
             }
 
-            UpdateMaterialViewCacheMetadata(showRetainer);
+            UpdateMaterialViewCacheMetadata(retainerRevision);
         }
         catch (Exception ex)
         {
@@ -544,7 +526,7 @@ public class CraftingMaterialsWindow : M3PanelWindow
         return missing;
     }
 
-    private void UpdateMaterialViewCacheMetadata(bool showRetainer)
+    private void UpdateMaterialViewCacheMetadata(int retainerRevision)
     {
         _cachedMaterialViewValid = true;
         _cachedMaterialViewEditor = _editor;
@@ -552,12 +534,12 @@ public class CraftingMaterialsWindow : M3PanelWindow
         _cachedMaterialViewShowPrecrafts = _matsShowPrecrafts;
         _cachedMaterialViewPreferVendors = _matsPreferVendors;
         _cachedMaterialViewKeepFulfilled = _matsKeepFulfilled;
-        _cachedMaterialViewShowRetainer = showRetainer;
+        _cachedRetainerRevision = retainerRevision;
         _cachedMobDropInfoInitialized = MobDropInfoCache.IsInitialized;
     }
 
     private bool TryCreateMaterialEntry(ExcelSheet<Item> itemSheet, uint itemId, int needed, bool isPrecraft,
-        RetainerItemSnapshot retainerSnapshot, bool countRetainersTowardNeed, out MaterialEntry entry)
+        VulcanRetainerInventory? retainers, bool countRetainersTowardNeed, out MaterialEntry entry)
     {
         entry = default;
         if (!itemSheet.TryGetRow(itemId, out var item))
@@ -566,15 +548,15 @@ public class CraftingMaterialsWindow : M3PanelWindow
         }
 
         var have = _editor?.GetInventoryCount(itemId) ?? 0;
-        var retNQ = retainerSnapshot.GetCountNQ(itemId);
-        var retHQ = retainerSnapshot.GetCountHQ(itemId);
+        var counts = retainers?.GetCounts(itemId);
+        var (retNQ, retHQ) = counts ?? default;
         var effectiveAvailable = isPrecraft
             ? _editor?.GetDisplayCraftMaterialAvailableCount(itemId, retNQ, retHQ, countRetainersTowardNeed) ?? 0
             : _editor?.GetDisplayMaterialAvailableCount(itemId, retNQ, retHQ, countRetainersTowardNeed) ?? 0;
         var skipExtras = CraftingRowIcons.IsElementalCrystal(itemId);
         var currencyOptions = skipExtras ? [] : ResolveCurrencyOptions(itemId);
         var dropInfo = skipExtras ? MobDropItemInfo.Empty : MobDropInfoCache.GetDropInfoForItem(itemId);
-        entry = new MaterialEntry(itemId, have, retNQ, retHQ, needed, effectiveAvailable, item.Name.ExtractText(), item.Icon, isPrecraft, currencyOptions, dropInfo);
+        entry = new MaterialEntry(itemId, have, counts?.NQ, counts?.HQ, needed, effectiveAvailable, item.Name.ExtractText(), item.Icon, isPrecraft, currencyOptions, dropInfo);
         return true;
     }
 
@@ -760,12 +742,7 @@ public class CraftingMaterialsWindow : M3PanelWindow
     private void DrawMaterialTable(MaterialPanel panel, Vector2 size)
     {
         var mode = panel.RetainerColumns;
-        var columnCount = mode switch
-        {
-            RetainerColumnMode.Total => 5,
-            RetainerColumnMode.Split => 6,
-            _ => 4,
-        };
+        var columnCount = mode == RetainerColumnMode.Split ? 6 : 5;
 
         float headerWidth;
         using (ImRaii.PushFont(M3.LabelSmall))
@@ -810,13 +787,13 @@ public class CraftingMaterialsWindow : M3PanelWindow
         {
             case RetainerColumnMode.Total:
                 ImGui.TableNextColumn();
-                M3Table.Header("雇员", "雇员库存总量（通过 Allagan Tools）");
+                M3Table.Header("雇员", VulcanRetainerPreview.InventoryTooltip);
                 break;
             case RetainerColumnMode.Split:
                 ImGui.TableNextColumn();
-                M3Table.Header("雇员 NQ", "通过 Allagan Tools 查看雇员持有的 NQ 数量");
+                M3Table.Header("雇员 NQ", VulcanRetainerPreview.InventoryTooltip);
                 ImGui.TableNextColumn();
-                M3Table.Header("雇员 HQ", "通过 Allagan Tools 查看雇员持有的 HQ 数量");
+                M3Table.Header("雇员 HQ", VulcanRetainerPreview.InventoryTooltip);
                 break;
         }
 
@@ -945,11 +922,11 @@ public class CraftingMaterialsWindow : M3PanelWindow
         }
     }
 
-    private static void CenterCount(int value, Vector4 color)
+    private static void CenterCount(int? value, Vector4 color)
     {
-        if (value > 0)
+        if (value is { } count)
         {
-            CenterNumber(value, color);
+            CenterNumber(count, color);
         }
         else
         {

@@ -293,9 +293,6 @@ namespace GatherBuddy.Plugin
         {
             EzIPC.Init(typeof(AllaganTools), "AllaganTools");
             Debug.Assert(ItemCountOwned != null);
-            Debug.Assert(ItemCount != null);
-            Debug.Assert(ItemCountHQ != null);
-            Debug.Assert(GetCharactersOwnedByActive != null);
             Debug.Assert(IsInitialized != null);
         }
 
@@ -303,15 +300,6 @@ namespace GatherBuddy.Plugin
 
         [EzIPC("AllaganTools.ItemCountOwned", applyPrefix: false)]
         internal static readonly Func<uint, bool, uint[], uint> ItemCountOwned;
-
-        [EzIPC("AllaganTools.ItemCount", applyPrefix: false)]
-        internal static readonly Func<uint, ulong, uint, uint> ItemCount;
-
-        [EzIPC("AllaganTools.ItemCountHQ", applyPrefix: false)]
-        internal static readonly Func<uint, ulong, uint, uint> ItemCountHQ;
-
-        [EzIPC("AllaganTools.GetCharactersOwnedByActive", applyPrefix: false)]
-        internal static readonly Func<bool, HashSet<ulong>> GetCharactersOwnedByActive;
 
         [EzIPC("AllaganTools.IsInitialized", applyPrefix: false)]
         internal static readonly Func<bool> IsInitialized;

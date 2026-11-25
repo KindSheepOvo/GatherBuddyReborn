@@ -17,8 +17,6 @@ public partial class VulcanWindow
 {
     private const string BulkAddRecipesDialogId = "##bulkAddRecipes";
 
-    private static readonly M3PluginRequirement[] RecipeAllaganToolsPlugin = [new("InventoryTools", "Allagan Tools")];
-
     private void DrawFilterPanel()
     {
         if (DrawSearchInputWithInlineClear("##recipeSearch", "搜索配方", ref _recipeSearchText, 256))
@@ -661,33 +659,23 @@ public partial class VulcanWindow
     {
         using var card = M3Card.Begin("##recipeActions", "制作", FontAwesomeIcon.Hammer, M3.AccentFor(0));
         M3Widgets.RowNumber("数量###Quantity##browserQty", ref _browserCraftQuantity, 1, 1, 9999);
-        if (!M3Plugins.AllLoaded(RecipeAllaganToolsPlugin))
-        {
-            _browserRetainerRestock = false;
-        }
+        M3Widgets.RowSwitch("考虑雇员库存并取回材料###Restock from retainers##browserRestock", ref _browserRetainerRestock,
+            "制作前核实游戏内雇员库存并取回缺少的材料。");
 
-        M3Widgets.RowPluginSwitch("从雇员补充材料###Restock from retainers##browserRestock", ref _browserRetainerRestock, RecipeAllaganToolsPlugin,
-            "制作前从雇员处取回缺少的材料。");
-
-        var artisanLoaded = IPCSubscriber.IsReady("Artisan");
-        const string artisanTooltip = "Artisan 已加载。请卸载 Artisan 后使用 Vulcan 制作。";
-        if (M3Widgets.Button("##startCraft", "开始制作", M3ButtonStyle.Filled, FontAwesomeIcon.Play, enabled: !artisanLoaded,
-                tooltip: artisanLoaded ? artisanTooltip : $"制作 {recipe.Name} ×{_browserCraftQuantity}"))
+        var blocker = IPCSubscriber.IsReady("Artisan") ? ArtisanLoadedTooltip : null;
+        if (M3Widgets.Button("##startCraft", "开始制作", M3ButtonStyle.Filled, FontAwesomeIcon.Play, enabled: blocker == null,
+                tooltip: blocker ?? $"制作 {recipe.Name} ×{_browserCraftQuantity}")
+            && StartBrowserCraft(recipe.Recipe, _browserCraftQuantity))
         {
-            StartBrowserCraft(recipe.Recipe, _browserCraftQuantity);
             MinimizeWindow();
         }
 
         ImGui.SameLine(0, M3.Space2);
         var canQuickSynth = recipe.Recipe.CanQuickSynth;
-        if (M3Widgets.Button("##quickSynth", "简易制作", M3ButtonStyle.Tonal, FontAwesomeIcon.Forward, enabled: canQuickSynth && !artisanLoaded,
-                tooltip: artisanLoaded
-                    ? artisanTooltip
-                    : canQuickSynth
-                        ? $"简易制作 {recipe.Name} ×{_browserCraftQuantity}"
-                        : "此配方无法简易制作。"))
+        if (M3Widgets.Button("##quickSynth", "简易制作", M3ButtonStyle.Tonal, FontAwesomeIcon.Forward, enabled: canQuickSynth && blocker == null,
+                tooltip: blocker ?? (canQuickSynth ? $"简易制作 {recipe.Name} ×{_browserCraftQuantity}" : "此配方无法简易制作。"))
+            && StartBrowserQuickSynth(recipe.Recipe, _browserCraftQuantity))
         {
-            StartBrowserQuickSynth(recipe.Recipe, _browserCraftQuantity);
             MinimizeWindow();
         }
 

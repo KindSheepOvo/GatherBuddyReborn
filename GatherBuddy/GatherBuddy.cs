@@ -146,7 +146,7 @@ public partial class GatherBuddy : IDalamudPlugin
             VendorBuyListManager = new Vulcan.Vendors.VendorBuyListManager();
             CraftingGameInterop.Initialize();
             CraftingGatherBridge.Initialize(this);
-            CraftingGameInterop.CraftFinished += (recipe, cancelled) => CraftingGatherBridge.OnCraftFinished(recipe, cancelled);
+            CraftingGameInterop.CraftFinished += CraftingGatherBridge.OnCraftFinished;
 
             Task.Run(() =>
             {
@@ -296,8 +296,11 @@ public partial class GatherBuddy : IDalamudPlugin
 
         try
         {
-            CraftingGameInterop.Update();
-            CraftingGatherBridge.Update();
+            if (Dalamud.ClientState.IsLoggedIn)
+            {
+                CraftingGameInterop.Update();
+                CraftingGatherBridge.Update();
+            }
             VendorNavigator.Update();
             VendorPurchaseManager.Update();
             VendorBuyListManager.Update();
@@ -334,6 +337,7 @@ public partial class GatherBuddy : IDalamudPlugin
             Dalamud.PluginInterface.UiBuilder.OpenConfigUi -= Interface.OpenSettings;
             Dalamud.PluginInterface.UiBuilder.OpenMainUi -= Interface.Toggle;
         }
+        CraftingGameInterop.CraftFinished -= CraftingGatherBridge.OnCraftFinished;
         CraftingGatherBridge.Dispose();
         CraftingGameInterop.Dispose();
         FishRecorder?.Dispose();

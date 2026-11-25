@@ -7,6 +7,7 @@ using GatherBuddy.Plugin;
 using Lumina.Excel.Sheets;
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace GatherBuddy.Crafting;
 
@@ -37,20 +38,22 @@ public class CraftingQueueProcessor
     private RaphaelSolveCoordinator? _raphaelCoordinator = null;
     private CraftingListConsumableSettings? _listConsumables = null;
     private DateTime _consumableDelayUntil = DateTime.MinValue;
-    private bool _retainerRestock = false;
     private RetainerTaskExecutor? _retainerExecutor = null;
     private RetainerBellNavigator? _retainerBellNavigator = null;
 
     private bool _paused = false;
+    private bool _pausedForInventoryFull;
     private bool _pausedDuringGather = false;
     private uint _currentProcessedRecipeId = 0;
     private int _currentProcessedRecipeCount = 0;
     private int _currentProcessedRecipeTotal = 0;
     private DateTime _craftHangSince = DateTime.MinValue;
     private bool _lastCraftWasQuickSynth = false;
+    private int _lastQuickSynthProgress;
     private readonly Dictionary<string, RaphaelSolveRequest> _enqueuedRaphaelRequests = [];
     private uint _jobSwitchRequestedFor = 0u;
     private readonly Dictionary<uint, int> _missingIngredientFailures = [];
+    private bool _skippedCraftsAfterFailure;
     private string _pauseReason = string.Empty;
 
     private List<CraftingListItem> QueueItems => _executionPlan?.Queue ?? EmptyQueue;
@@ -65,6 +68,7 @@ public class CraftingQueueProcessor
     public IReadOnlyList<CraftingListItem> Queue => QueueItems;
     public CraftingListItem? CurrentRecipeItem => _currentQueueIndex < QueueItems.Count ? QueueItems[_currentQueueIndex] : null;
     public bool Paused => _paused;
+    internal bool PausedForInventoryFull => _pausedForInventoryFull;
     public string PauseReason => _pauseReason;
     public uint CurrentProcessedRecipeId => _currentProcessedRecipeId;
     public int CurrentProcessedRecipeCount => _currentProcessedRecipeCount;
@@ -72,15 +76,64 @@ public class CraftingQueueProcessor
     public CraftingListConsumableSettings? ListConsumables => _listConsumables;
     public bool HasPendingTasks() => _tasks.Count > 0;
 
+    internal bool CanRefreshStockPlan => !_paused && !HasPendingTasks()
+        && _currentState is QueueState.Idle or QueueState.WaitingForGather or QueueState.WaitingForJobSwitch or QueueState.ReadyForCraft or QueueState.Complete;
+
+    internal bool NeedsUpdate => !_paused && (HasPendingTasks() || _currentState is QueueState.WaitingForJobSwitch
+        or QueueState.WaitingForRaphaelSolution or QueueState.ReadyForCraft or QueueState.Crafting);
+
+    internal bool MatchesRemainingPlan(CraftingExecutionPlan plan, bool compareGatherTargets)
+    {
+        if (_executionPlan == null || _skippedCraftsAfterFailure
+            || compareGatherTargets && (MaterialTargets.Count != plan.Materials.Count
+                || MaterialTargets.Any(item => plan.Materials.GetValueOrDefault(item.Key) != item.Value))
+            || RetainerPrecraftTargets.Count != plan.RetainerConsumedCraftables.Count
+            || RetainerPrecraftTargets.Any(item => plan.RetainerConsumedCraftables.GetValueOrDefault(item.Key) != item.Value))
+        {
+            return false;
+        }
+
+        var remainingGroups = plan.GroupedQueue;
+        var consumed = _currentQueueIndex;
+        var index = 0;
+        foreach (var group in _executionPlan.GroupedQueue)
+        {
+            if (consumed >= group.Quantity)
+            {
+                consumed -= group.Quantity;
+                continue;
+            }
+
+            if (index == remainingGroups.Count)
+            {
+                return false;
+            }
+
+            var remaining = remainingGroups[index++];
+            if (remaining.RecipeId != group.RecipeId || remaining.IsOriginalRecipe != group.IsOriginalRecipe
+                || remaining.Quantity != group.Quantity - consumed)
+            {
+                return false;
+            }
+
+            consumed = 0;
+        }
+
+        return index == remainingGroups.Count;
+    }
+
+    internal void UpdateRemainingRequirements(CraftingExecutionPlan plan)
+        => _executionPlan?.UpdateRemainingRequirements(plan);
+
     public delegate void StateChangedHandler(QueueState state);
     public delegate void QueueCompletedHandler();
 
     public event StateChangedHandler? StateChanged;
     public event QueueCompletedHandler? QueueCompleted;
+    internal event System.Action? StockCheckpointAvailable;
 
     public CraftingQueueProcessor()
     {
-        CraftingGameInterop.CraftFinished += OnCraftFinished;
         CraftingGameInterop.QuickSynthProgress += OnQuickSynthProgress;
     }
 
@@ -95,12 +148,12 @@ public class CraftingQueueProcessor
         _enqueuedRaphaelRequests.Clear();
         _jobSwitchRequestedFor = 0u;
         _missingIngredientFailures.Clear();
+        _skippedCraftsAfterFailure = false;
         _pauseReason = string.Empty;
-        _retainerRestock = executionPlan.RetainerRestock;
         _retainerExecutor = null;
         _retainerBellNavigator = null;
-        var hasRetainerWork = _retainerRestock && AllaganTools.Enabled
-            && (MaterialTargets.Count > 0 || RetainerPrecraftTargets.Count > 0);
+        var hasRetainerWork = executionPlan.RetainerInventory is { IsComplete: true } retainers
+            && (RetainerPrecraftTargets.Count > 0 || MaterialTargets.Any(material => NeedsRetainerMaterial(executionPlan, retainers, material)));
 
         if (hasRetainerWork)
         {
@@ -147,6 +200,13 @@ public class CraftingQueueProcessor
         StateChanged?.Invoke(_currentState);
     }
 
+    private static bool NeedsRetainerMaterial(CraftingExecutionPlan plan, VulcanRetainerInventory retainers, KeyValuePair<uint, int> material)
+    {
+        var (nq, hq) = retainers.GetCounts(material.Key);
+        var shortage = plan.GetMaterialShortage(material);
+        return shortage.ConsumeSplit(nq, hq, out _, out _).Total < shortage.Total;
+    }
+
     public void Update()
     {
         if (_paused)
@@ -154,7 +214,19 @@ public class CraftingQueueProcessor
             return;
         }
 
-        ProcessTasks();
+        if (HasPendingTasks())
+        {
+            ProcessTasks();
+            if (!HasPendingTasks())
+            {
+                StockCheckpointAvailable?.Invoke();
+            }
+        }
+
+        if (_paused || CraftingGatherBridge.HoldQueueForStockPlan(this))
+        {
+            return;
+        }
 
         switch (_currentState)
         {
@@ -200,7 +272,7 @@ public class CraftingQueueProcessor
                     }
                     else if ((DateTime.Now - _craftHangSince).TotalSeconds > 3.0)
                     {
-                        if (IsInventoryFull())
+                        if (CraftingStockRun.IsInventoryFull())
                         {
                             _craftHangSince = DateTime.MinValue;
                             PauseForInventoryFull("队列已暂停，因为背包已满，无法继续制作。");
@@ -572,7 +644,7 @@ public class CraftingQueueProcessor
             return;
         }
 
-        if (IsInventoryFull())
+        if (CraftingStockRun.IsInventoryFull())
         {
             PauseForInventoryFull("队列已暂停，因为背包已满，无法开始制作。");
             return;
@@ -674,6 +746,7 @@ public class CraftingQueueProcessor
         GatherBuddy.Log.Debug($"[CraftingQueueProcessor] Effective solver mode for this craft: {effectiveSolverMode}");
 
         _lastCraftWasQuickSynth = useQuickSynthesis;
+        _lastQuickSynthProgress = 0;
         GatherBuddy.Log.Information($"[CraftingQueueProcessor] Starting craft {_currentQueueIndex + 1}/{QueueItems.Count}: {recipe.Value.ItemResult.Value.Name} x{craftQuantity}");
         CraftingGameInterop.StartCraft(recipe.Value, craftQuantity, useQuickSynthesis);
         _currentState = QueueState.Crafting;
@@ -747,14 +820,16 @@ public class CraftingQueueProcessor
 
     private void OnQuickSynthProgress(int current, int max)
     {
-        if (current == 0)
+        if (_currentState != QueueState.Crafting || !_lastCraftWasQuickSynth || current <= _lastQuickSynthProgress || current > max)
         {
             return;
         }
 
-        GatherBuddy.Log.Debug($"[CraftingQueueProcessor] Quick synth progress: {current}/{max}, incrementing index");
-        _currentQueueIndex++;
-        _currentProcessedRecipeCount++;
+        var completed = current - _lastQuickSynthProgress;
+        _lastQuickSynthProgress = current;
+        GatherBuddy.Log.Debug($"[CraftingQueueProcessor] Quick synth progress: {current}/{max}");
+        _currentQueueIndex = Math.Min(QueueItems.Count, _currentQueueIndex + completed);
+        _currentProcessedRecipeCount += completed;
 
         if (current == max)
         {
@@ -778,7 +853,7 @@ public class CraftingQueueProcessor
 
         if (cancelled)
         {
-            if (IsInventoryFull())
+            if (CraftingStockRun.IsInventoryFull())
             {
                 PauseForInventoryFull("队列已暂停，因为制作过程中背包已满。");
                 return;
@@ -864,6 +939,7 @@ public class CraftingQueueProcessor
             }
 
             queueItem.Options.Skipping = true;
+            _skippedCraftsAfterFailure = true;
             skippedCount++;
             GatherBuddy.Log.Debug($"[CraftingQueueProcessor] Marked queue index {i} for recipe {recipeId} as skipped after repeated missing-material preparation failure");
         }
@@ -1257,6 +1333,12 @@ public class CraftingQueueProcessor
 
     private void QueueRetainerWithdrawalTasks()
     {
+        if (_executionPlan?.RetainerInventory is not { } retainers)
+        {
+            TransitionFromRetainerWithdrawComplete();
+            return;
+        }
+
         RefreshRetainerRestockPlanForWithdrawal();
         GatherBuddy.Log.Debug($"[CraftingQueueProcessor] Building retainer withdrawal plan ({RetainerPrecraftTargets.Count} craftable pull target(s), {MaterialTargets.Count} leaf material(s))");
 
@@ -1274,14 +1356,14 @@ public class CraftingQueueProcessor
         }
 
         var qualityTargets = _executionPlan?.BuildQualityTargetsForItems(combinedItems) ?? [];
-        _retainerExecutor = new RetainerTaskExecutor(combinedItems, qualityTargets, [.. RetainerPrecraftTargets.Keys]);
+        _retainerExecutor = new RetainerTaskExecutor(retainers, combinedItems, qualityTargets, [.. RetainerPrecraftTargets.Keys]);
 
         QueueRetainerWithdrawalExecutionTasks();
     }
 
     private void RefreshRetainerRestockPlanForWithdrawal()
     {
-        if (!_retainerRestock || !AllaganTools.Enabled || _executionPlan == null)
+        if (_executionPlan?.RetainerInventory == null)
         {
             return;
         }
@@ -1364,17 +1446,12 @@ public class CraftingQueueProcessor
             }
 
             var result = _retainerExecutor.Tick();
-            if (result == CraftingTasks.TaskResult.Done)
+            if (result == CraftingTasks.TaskResult.Done && _retainerExecutor.IsAborted)
             {
-                if (_retainerExecutor.IsAborted)
-                {
-                    GatherBuddy.Log.Warning("[CraftingQueueProcessor] Retainer withdrawal aborted, rebuilding from current inventory");
-                }
-                else
-                {
-                    GatherBuddy.Log.Information("[CraftingQueueProcessor] Retainer withdrawal complete");
-                }
+                CraftingGatherBridge.PauseStockRun(_retainerExecutor.FailureReason ?? "雇员取回已中断。请点击「继续」按当前库存重新计算。");
+                return CraftingTasks.TaskResult.Abort;
             }
+
             return result;
         });
 
@@ -1388,27 +1465,6 @@ public class CraftingQueueProcessor
     private unsafe void TransitionFromRetainerWithdrawComplete()
     {
         RebuildQueueAndMaterialsFromCurrentInventory();
-        GatherBuddy.Log.Debug("[CraftingQueueProcessor] Computing remaining materials after retainer withdrawal");
-
-        var stillGatherCount = 0;
-        var inventoryMgr = FFXIVClientStructs.FFXIV.Client.Game.InventoryManager.Instance();
-        foreach (var (itemId, totalNeeded) in MaterialTargets)
-        {
-            var inBag = 0;
-            if (inventoryMgr != null)
-            {
-                inBag = (int)(inventoryMgr->GetInventoryItemCount(itemId, false, false, false)
-                            + inventoryMgr->GetInventoryItemCount(itemId, true, false, false));
-            }
-
-            if (inBag < totalNeeded)
-            {
-                stillGatherCount++;
-            }
-        }
-
-        GatherBuddy.Log.Information($"[CraftingQueueProcessor] After retainer withdrawal: {stillGatherCount} item(s) still need gathering");
-
         _currentState = QueueState.WaitingForGather;
         StateChanged?.Invoke(_currentState);
         CraftingGatherBridge.CreateGatherListForMissingIngredients(MaterialTargets);
@@ -1591,6 +1647,26 @@ public class CraftingQueueProcessor
         }
     }
 
+    internal bool CloseRetainerForReplan()
+    {
+        if (_retainerExecutor is not { } executor || !executor.RequestClose())
+        {
+            return false;
+        }
+
+        _paused = false;
+        _tasks.Clear();
+        YesAlready.Lock();
+        _tasks.Add(executor.Tick);
+        _tasks.Add(() =>
+        {
+            _retainerExecutor = null;
+            _currentState = QueueState.Idle;
+            return CraftingTasks.TaskResult.Done;
+        });
+        return true;
+    }
+
     public void Resume()
     {
         if (!_paused)
@@ -1600,6 +1676,7 @@ public class CraftingQueueProcessor
 
         GatherBuddy.Log.Information("[CraftingQueueProcessor] Resuming queue");
         _paused = false;
+        _pausedForInventoryFull = false;
         _pauseReason = string.Empty;
         YesAlready.Lock();
 
@@ -1687,6 +1764,7 @@ public class CraftingQueueProcessor
 
     public void Reset()
     {
+        CraftingGameInterop.QuickSynthProgress -= OnQuickSynthProgress;
         YesAlready.Unlock();
         _executionPlan = null;
         _currentQueueIndex = 0;
@@ -1700,7 +1778,6 @@ public class CraftingQueueProcessor
         _missingIngredientFailures.Clear();
         _enqueuedRaphaelRequests.Clear();
         _jobSwitchRequestedFor = 0u;
-        _retainerRestock = false;
         _retainerExecutor = null;
         _retainerBellNavigator?.Stop();
         _retainerBellNavigator = null;
@@ -1715,16 +1792,12 @@ public class CraftingQueueProcessor
         QueueRepairTasks();
     }
 
-    private unsafe bool IsInventoryFull()
-    {
-        var inventoryManager = InventoryManager.Instance();
-        return inventoryManager != null && inventoryManager->GetEmptySlotsInBag() == 0;
-    }
-
     private void PauseForInventoryFull(string message)
     {
+        _pausedForInventoryFull = true;
         var pauseReason = $"{message} 腾出背包空间后，点击「继续」恢复当前制作队列。";
         GatherBuddy.Log.Warning($"[CraftingQueueProcessor] {pauseReason}");
         Pause(pauseReason);
+        StockCheckpointAvailable?.Invoke();
     }
 }

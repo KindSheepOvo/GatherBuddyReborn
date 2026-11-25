@@ -20,11 +20,7 @@ public partial class VulcanWindow
             GatherBuddy.Log.Debug($"[VulcanWindow] Quick Synth All active (PreferNQ={list.QuickSynthAllPreferNQ}, PrecraftsOnly={list.QuickSynthAllPrecraftsOnly})");
         }
 
-        var executionPlan = CraftingExecutionPlan.Create(list);
-
-        GatherBuddy.Log.Information($"[VulcanWindow] Starting crafting list '{list.Name}' with {executionPlan.QueueView.Count} crafts from {executionPlan.ResolvedPlan.Recipes.Count} planned recipes");
-        CraftingGatherBridge.StartQueueCraftAndGather(
-            executionPlan, list.Consumables, list.Ephemeral ? (int?)list.ID : null);
+        CraftingGatherBridge.StartQueueCraftAndGather(list, additionalCrafts: list.ID < 0);
     }
 
     private static RecipeCraftSettings? BuildEffectiveQueueCraftSettings(

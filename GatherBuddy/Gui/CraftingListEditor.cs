@@ -68,9 +68,7 @@ public class CraftingListEditor
 
     private readonly Dictionary<uint, (int NQ, int HQ)> _cachedInventorySplitCounts = [];
     private readonly Dictionary<uint, DateTime> _inventoryRefreshTimes = [];
-    private RetainerItemSnapshot _cachedRetainerSnapshot = RetainerItemSnapshot.Empty;
-    private uint[] _cachedRetainerSnapshotItemIds = [];
-    private DateTime _cachedRetainerSnapshotAt = DateTime.MinValue;
+    private int _retainerPreviewRevision = VulcanRetainerPreview.Revision;
     private readonly HashSet<uint> _watchedInventoryItemIds = [];
     private readonly HashSet<uint> _watchedOriginalResultItemIds = [];
     private readonly HashSet<uint> _watchedPrecraftResultItemIds = [];
@@ -80,7 +78,6 @@ public class CraftingListEditor
     private bool _pendingQueueRefreshFromInventory;
     private bool _pendingMaterialsRefreshFromInventory;
     private const double InventoryRefreshIntervalSeconds = 0.5;
-    private const double RetainerSnapshotRetryIntervalSeconds = 1.0;
     private const double InventoryChangeDebounceSeconds = 0.2;
 
     private readonly RecipeCraftSettingsPopup _craftSettingsPopup = new();
@@ -249,7 +246,7 @@ public class CraftingListEditor
     {
         _cachedInventorySplitCounts.Clear();
         _inventoryRefreshTimes.Clear();
-        InvalidateRetainerSnapshot();
+        Interlocked.Increment(ref _materialCacheVersion);
     }
 
     internal void RefreshFromExternalListChange()
@@ -469,22 +466,25 @@ public class CraftingListEditor
 
     private void ProcessPendingInventoryChanges()
     {
+        var retainerRevision = VulcanRetainerPreview.Revision;
+        var retainerChanged = _list.RetainerRestock && _retainerPreviewRevision != retainerRevision;
+        _retainerPreviewRevision = retainerRevision;
         bool refreshQueue;
         bool refreshMaterials;
         lock (_inventoryChangeLock)
         {
-            if (!_pendingQueueRefreshFromInventory && !_pendingMaterialsRefreshFromInventory)
+            if (!retainerChanged && !_pendingQueueRefreshFromInventory && !_pendingMaterialsRefreshFromInventory)
             {
                 return;
             }
 
-            if ((DateTime.Now - _lastGraphAffectingInventoryChange).TotalSeconds < InventoryChangeDebounceSeconds)
+            if (!retainerChanged && (DateTime.Now - _lastGraphAffectingInventoryChange).TotalSeconds < InventoryChangeDebounceSeconds)
             {
                 return;
             }
 
-            refreshQueue = _pendingQueueRefreshFromInventory;
-            refreshMaterials = _pendingMaterialsRefreshFromInventory;
+            refreshQueue = retainerChanged || _pendingQueueRefreshFromInventory;
+            refreshMaterials = retainerChanged || _pendingMaterialsRefreshFromInventory;
             _pendingQueueRefreshFromInventory = false;
             _pendingMaterialsRefreshFromInventory = false;
         }
@@ -581,7 +581,6 @@ public class CraftingListEditor
     private const string ConfirmFailedMacrosDialogId = "Start crafting anyway###gbr_confirm_failed_macros";
     private const string RecipePickerPopupId = "##recipe_picker_menu";
     private const string ArtisanLoadedTooltip = "Artisan 已加载。使用 Vulcan 制作前，请先禁用 Artisan。";
-    private static readonly M3PluginRequirement[] AllaganToolsPlugin = [new("InventoryTools", "Allagan Tools")];
     private static readonly Vector4 HueQuickSynth = new(0.30f, 0.90f, 0.90f, 1f);
 
     private static float QueueRowHeight
@@ -926,6 +925,7 @@ public class CraftingListEditor
     private void DrawQueueOptionsCard()
     {
         using var card = M3Card.Begin("##queue_options_card", "队列选项", FontAwesomeIcon.SlidersH, M3.AccentFor(1));
+
         var skipIfEnough = _list.SkipIfEnough;
         if (M3Widgets.RowSwitch("持有数量足够时跳过##sie", ref skipIfEnough, "跳过持有数量已经足够的半成品。"))
         {
@@ -980,13 +980,9 @@ public class CraftingListEditor
             }
         }
 
-        var allaganEnabled = AllaganTools.Enabled;
         var retainerRestock = _list.RetainerRestock;
-        if (M3Widgets.RowPluginSwitch("从雇员取回材料##rrr", ref retainerRestock, AllaganToolsPlugin,
-                allaganEnabled
-                    ? "在生成采集清单前，按 HQ/NQ 设置从雇员取回所需材料。"
-                    : "需要安装并启用 Allagan Tools。",
-                enabled: allaganEnabled))
+        if (M3Widgets.RowSwitch("考虑雇员库存并取回材料##rrr", ref retainerRestock,
+                "制作按游戏库存计算缺口，所需材料按 HQ/NQ 设置取回。"))
         {
             _list.RetainerRestock = retainerRestock;
             SaveListAndRefresh(true);
@@ -2150,7 +2146,7 @@ public class CraftingListEditor
             ConsumeFinalAvailability: true));
 
     private static bool ShouldUseRetainerCraftablePlanning(CraftingListDefinition planningList)
-        => planningList.SkipIfEnough && planningList.RetainerRestock && AllaganTools.Enabled;
+        => planningList.SkipIfEnough && planningList.RetainerRestock;
 
     private MaterialCacheSnapshot EnsureMaterialCache(string hash)
     {
@@ -2555,60 +2551,6 @@ public class CraftingListEditor
         {
             return (0, 0);
         }
-    }
-
-    internal static int GetRetainerCount(uint itemId)
-        => RetainerItemQuery.GetTotalCount(itemId);
-    internal void InvalidateRetainerSnapshot()
-    {
-        _cachedRetainerSnapshot = RetainerItemSnapshot.Empty;
-        _cachedRetainerSnapshotItemIds = [];
-        _cachedRetainerSnapshotAt = DateTime.MinValue;
-        Interlocked.Increment(ref _materialCacheVersion);
-    }
-
-    internal RetainerItemSnapshot GetRetainerSnapshot(IEnumerable<uint> itemIds, bool forceRefresh = false)
-    {
-        if (!AllaganTools.Enabled)
-        {
-            return RetainerItemSnapshot.Empty;
-        }
-
-        var uniqueItemIds = new HashSet<uint>();
-        foreach (var id in itemIds)
-        {
-            if (id > 0)
-            {
-                uniqueItemIds.Add(id);
-            }
-        }
-
-        var snapshotItemIds = new uint[uniqueItemIds.Count];
-        uniqueItemIds.CopyTo(snapshotItemIds);
-        Array.Sort(snapshotItemIds);
-
-        if (snapshotItemIds.Length == 0)
-        {
-            return RetainerItemSnapshot.Empty;
-        }
-
-        if (!forceRefresh && _cachedRetainerSnapshotItemIds.AsSpan().SequenceEqual(snapshotItemIds))
-        {
-            if (_cachedRetainerSnapshot.IsComplete)
-            {
-                return _cachedRetainerSnapshot;
-            }
-
-            if ((DateTime.Now - _cachedRetainerSnapshotAt).TotalSeconds < RetainerSnapshotRetryIntervalSeconds)
-            {
-                return _cachedRetainerSnapshot;
-            }
-        }
-
-        _cachedRetainerSnapshot = RetainerItemQuery.CreateSnapshot(snapshotItemIds);
-        _cachedRetainerSnapshotItemIds = snapshotItemIds;
-        _cachedRetainerSnapshotAt = DateTime.Now;
-        return _cachedRetainerSnapshot;
     }
 
     internal int GetQualityAwareAvailableCount(uint itemId, int retNQ, int retHQ, bool countRetainersTowardNeed)

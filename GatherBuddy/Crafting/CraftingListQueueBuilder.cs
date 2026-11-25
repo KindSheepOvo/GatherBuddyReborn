@@ -16,8 +16,10 @@ public static class CraftingListQueueBuilder
             })];
 
     public static List<CraftingListItem> CreateExpandedQueue(CraftingListDefinition list, CraftingListPlan plan)
+        => CreateExpandedQueue(list, CreateGroupedQueue(plan));
+
+    internal static List<CraftingListItem> CreateExpandedQueue(CraftingListDefinition list, IReadOnlyList<CraftingListItem> sortedRecipes)
     {
-        var sortedRecipes = CreateGroupedQueue(plan);
         var expandedQueue = new List<CraftingListItem>();
 
         foreach (var recipeItem in sortedRecipes)

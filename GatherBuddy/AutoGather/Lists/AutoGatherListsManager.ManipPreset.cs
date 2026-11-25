@@ -576,6 +576,11 @@ public partial class AutoGatherListsManager
 
     private bool RemoveCompletedItemsFromEnabledLists()
     {
+        if (_craftingGatherList != null)
+        {
+            return false;
+        }
+
         var removedAny = false;
         foreach (var list in _fileSystem.Values)
         {

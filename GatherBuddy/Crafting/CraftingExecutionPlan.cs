@@ -1,14 +1,18 @@
-using GatherBuddy.Plugin;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
+using System.Threading;
 
 namespace GatherBuddy.Crafting;
 
 public sealed class CraftingExecutionPlan
 {
+    private static int _lastVersion;
     private readonly CraftingListDefinition _planningSnapshot;
     private readonly bool _useRetainerCraftableAvailability;
+    private readonly CraftingListPlannerOptions _plannerOptions;
+    private List<CraftingListItem>? _queue;
+    private List<CraftingListItem>? _groupedQueue;
 
     public int ListId { get; }
     public string ListName { get; }
@@ -18,13 +22,15 @@ public sealed class CraftingExecutionPlan
     public bool RetainerRestock { get; }
     public CraftingListPlan ResolvedPlan { get; private set; }
 
-    internal List<CraftingListItem> Queue { get; private set; } = [];
-    internal List<CraftingListItem> OriginalRecipes { get; private set; } = [];
-    internal Dictionary<uint, int> Materials { get; private set; } = [];
-    internal Dictionary<uint, int> Precrafts { get; private set; } = [];
-    internal Dictionary<uint, int> RetainerConsumedCraftables { get; private set; } = [];
-    internal Dictionary<uint, IngredientQualityDemand> IngredientDemands { get; private set; } = [];
+    internal List<CraftingListItem> GroupedQueue => _groupedQueue ??= CraftingListQueueBuilder.CreateGroupedQueue(ResolvedPlan);
+    internal List<CraftingListItem> Queue => _queue ??= CraftingListQueueBuilder.CreateExpandedQueue(_planningSnapshot, GroupedQueue);
+    internal List<CraftingListItem> OriginalRecipes => ResolvedPlan.OriginalRecipes;
+    internal Dictionary<uint, int> Materials => ResolvedPlan.Materials;
+    internal Dictionary<uint, int> Precrafts => ResolvedPlan.Precrafts;
+    internal Dictionary<uint, int> RetainerConsumedCraftables => ResolvedPlan.RetainerConsumedCraftables;
+    internal Dictionary<uint, IngredientQualityDemand> IngredientDemands => ResolvedPlan.IngredientDemands;
     internal CraftingListDefinition PlanningSnapshot => _planningSnapshot;
+    internal VulcanRetainerInventory? RetainerInventory => _plannerOptions.RetainerInventory;
 
     public IReadOnlyList<CraftingListItem> QueueView => Queue;
     public IReadOnlyList<CraftingListItem> OriginalRecipesView => OriginalRecipes;
@@ -35,11 +41,12 @@ public sealed class CraftingExecutionPlan
 
     private CraftingExecutionPlan(
         CraftingListDefinition planningSnapshot,
-        bool useRetainerCraftableAvailability,
+        CraftingListPlannerOptions options,
         CraftingListPlan resolvedPlan)
     {
         _planningSnapshot = planningSnapshot;
-        _useRetainerCraftableAvailability = useRetainerCraftableAvailability;
+        _plannerOptions = options;
+        _useRetainerCraftableAvailability = options.UseRetainerCraftableAvailability;
         ListId = planningSnapshot.ID;
         ListName = planningSnapshot.Name;
         SkipIfEnough = planningSnapshot.SkipIfEnough;
@@ -49,17 +56,32 @@ public sealed class CraftingExecutionPlan
     }
 
     public static CraftingExecutionPlan Create(CraftingListDefinition list)
+        => Build(list.CreateRetainerPlanningSnapshot(), null);
+
+    internal static CraftingExecutionPlan CreateForRun(CraftingStockRun run)
+        => Build(run.List, run.ItemTargets, run.RetainerInventory);
+
+    private static CraftingExecutionPlan Build(CraftingListDefinition planningSnapshot, IReadOnlyDictionary<uint, int>? itemTargets,
+        VulcanRetainerInventory? retainerInventory = null)
     {
-        var planningSnapshot = list.CreateRetainerPlanningSnapshot();
-        var useRetainerCraftableAvailability = planningSnapshot.SkipIfEnough
-            && planningSnapshot.RetainerRestock
-            && AllaganTools.Enabled;
-        var resolvedPlan = planningSnapshot.CreatePlan(useRetainerCraftableAvailability);
-        return new CraftingExecutionPlan(planningSnapshot, useRetainerCraftableAvailability, resolvedPlan);
+        var useRetainerCraftableAvailability = planningSnapshot.SkipIfEnough && planningSnapshot.RetainerRestock;
+        var options = new CraftingListPlannerOptions(useRetainerCraftableAvailability, FinalItemTargets: itemTargets,
+            CountFinalRetainerStock: itemTargets != null && planningSnapshot.RetainerRestock)
+        {
+            RetainerInventory = retainerInventory,
+        };
+        var resolvedPlan = CraftingListPlanner.Build(planningSnapshot, options);
+        return new CraftingExecutionPlan(planningSnapshot, options, resolvedPlan);
     }
 
     public bool MatchesList(int listId)
         => ListId == listId;
+
+    internal void UpdateRemainingRequirements(CraftingExecutionPlan remaining)
+    {
+        ResolvedPlan = remaining.ResolvedPlan;
+        Version = remaining.Version;
+    }
 
     public void RefreshForRetainerWithdrawal()
     {
@@ -68,11 +90,23 @@ public sealed class CraftingExecutionPlan
             return;
         }
 
-        ApplyResolvedPlan(_planningSnapshot.CreatePlan(true));
+        ApplyResolvedPlan(CraftingListPlanner.Build(_planningSnapshot, _plannerOptions));
     }
 
     public void RefreshFromCurrentInventory()
-        => ApplyResolvedPlan(_planningSnapshot.CreatePlan(false));
+        => ApplyResolvedPlan(CraftingListPlanner.Build(_planningSnapshot, _plannerOptions with { UseRetainerCraftableAvailability = false }));
+
+    internal IngredientQualityDemand GetMaterialShortage(KeyValuePair<uint, int> material)
+    {
+        var demand = IngredientDemands.GetValueOrDefault(material.Key);
+        if (demand.Total == 0)
+        {
+            demand = IngredientQualityDemand.FromPreferHQ(material.Value);
+        }
+
+        var (nq, hq) = CraftingStockRun.GetInventoryCounts(material.Key);
+        return demand.ConsumeSplit(nq, hq, out _, out _);
+    }
 
     public Dictionary<uint, IngredientQualityDemand> BuildQualityTargetsForItems(IReadOnlyDictionary<uint, int> requestedItems)
     {
@@ -101,17 +135,9 @@ public sealed class CraftingExecutionPlan
     [MemberNotNull(nameof(ResolvedPlan))]
     private void ApplyResolvedPlan(CraftingListPlan resolvedPlan)
     {
-        Version++;
+        Version = Interlocked.Increment(ref _lastVersion);
         ResolvedPlan = resolvedPlan;
-        Materials = [with(resolvedPlan.Materials)];
-        Precrafts = [with(resolvedPlan.Precrafts)];
-        RetainerConsumedCraftables = [with(resolvedPlan.RetainerConsumedCraftables)];
-        IngredientDemands = [with(resolvedPlan.IngredientDemands)];
-        OriginalRecipes = [.. resolvedPlan.OriginalRecipes
-            .Select(item => new CraftingListItem(item.RecipeId, item.Quantity)
-            {
-                IsOriginalRecipe = true,
-            })];
-        Queue = CraftingListQueueBuilder.CreateExpandedQueue(_planningSnapshot, resolvedPlan);
+        _groupedQueue = null;
+        _queue = null;
     }
 }
