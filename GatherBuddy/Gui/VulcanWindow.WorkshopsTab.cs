@@ -335,9 +335,9 @@ public partial class VulcanWindow
             }
         }
 
-        var showRetainer = AllaganTools.Enabled;
+        var retainerInventory = VulcanRetainerPreview.GetVerifiedInventory();
         var itemSheet = Dalamud.GameData.GetExcelSheet<Item>();
-        DrawIngredientSectionHeader("部队工房所需材料", showRetainer);
+        DrawIngredientSectionHeader("部队工房所需材料");
         if (scope.Requirements.Count == 0)
         {
             M3Text.Draw("未找到当前选择的工房需求。", M3TextStyle.Faint);
@@ -348,7 +348,7 @@ public partial class VulcanWindow
             {
                 if (itemSheet != null && itemSheet.TryGetRow(requirement.ItemId, out var item))
                 {
-                    DrawIngredientRow(requirement.ItemId, requirement.RequiredQuantity, item, showRetainer);
+                    DrawIngredientRow(requirement.ItemId, requirement.RequiredQuantity, item, retainerInventory);
                 }
             }
         }

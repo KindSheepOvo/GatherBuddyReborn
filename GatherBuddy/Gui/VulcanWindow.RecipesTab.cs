@@ -14,9 +14,6 @@ public partial class VulcanWindow
     private static Vector2 LineIconSize => new(ImGui.GetTextLineHeight(), ImGui.GetTextLineHeight());
     private static Vector2 ItemSpacing => ImGui.GetStyle().ItemSpacing;
     private static float Scale => ImGuiHelpers.GlobalScale;
-    private static readonly Dictionary<uint, int> CachedRetainerIngredientCounts = [];
-    private static readonly Dictionary<uint, DateTime> RetainerIngredientRefreshTimes = [];
-    private const double RetainerIngredientRefreshIntervalSeconds = 1.0;
 
     private static float TextWidth(string text)
         => ImGui.CalcTextSize(text).X + ItemSpacing.X;

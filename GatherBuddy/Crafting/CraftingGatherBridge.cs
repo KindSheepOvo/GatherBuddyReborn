@@ -42,6 +42,7 @@ public static class CraftingGatherBridge
     public static void Initialize(global::GatherBuddy.GatherBuddy plugin)
     {
         _plugin = plugin;
+        VulcanRetainerPreview.Initialize();
     }
 
     private static int RoundUpToBatchSize(int quantity, int batchSize)
@@ -851,4 +852,7 @@ public static class CraftingGatherBridge
         _lastCollectablesWaitLog = DateTime.MinValue;
         _lastCollectablesExitAttempt = DateTime.MinValue;
     }
+
+    internal static void Dispose()
+        => VulcanRetainerPreview.Dispose();
 }

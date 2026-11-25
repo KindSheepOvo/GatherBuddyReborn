@@ -16,6 +16,7 @@ namespace GatherBuddy.Gui;
 public partial class VulcanWindow
 {
     private const string BulkAddRecipesDialogId = "##bulkAddRecipes";
+
     private static readonly M3PluginRequirement[] RecipeAllaganToolsPlugin = [new("InventoryTools", "Allagan Tools")];
 
     private void DrawFilterPanel()
@@ -557,23 +558,23 @@ public partial class VulcanWindow
         }
 
         var itemSheet = Dalamud.GameData.GetExcelSheet<Item>();
-        var showRetainer = AllaganTools.Enabled;
-        DrawIngredientSectionHeader("材料", showRetainer);
+        var retainerInventory = VulcanRetainerPreview.GetVerifiedInventory();
+        DrawIngredientSectionHeader("材料");
         foreach (var (itemId, needed) in directIngredients)
         {
             if (itemSheet != null && itemSheet.TryGetRow(itemId, out var item))
             {
-                DrawIngredientRow(itemId, needed, item, showRetainer);
+                DrawIngredientRow(itemId, needed, item, retainerInventory);
             }
         }
 
         ImGui.Dummy(new Vector2(0, M3.Space2));
-        DrawIngredientSectionHeader("全部材料（含中间品）", showRetainer);
+        DrawIngredientSectionHeader("全部材料（含中间品）");
         foreach (var (itemId, needed) in GetSortedResolvedIngredients(r))
         {
             if (itemSheet != null && itemSheet.TryGetRow(itemId, out var item))
             {
-                DrawIngredientRow(itemId, needed, item, showRetainer);
+                DrawIngredientRow(itemId, needed, item, retainerInventory);
             }
         }
 
@@ -715,11 +716,11 @@ public partial class VulcanWindow
 
     private const float IngredientColumnWidth = 44f;
 
-    private static void DrawIngredientSectionHeader(string title, bool showRetainer)
+    private static void DrawIngredientSectionHeader(string title)
     {
         var colWidth = VulcanUiScaling.Scaled(IngredientColumnWidth);
         var currentX = ImGui.GetCursorPosX();
-        var valueAreaStart = GetIngredientValueAreaStart(currentX, ImGui.GetContentRegionMax().X, showRetainer);
+        var valueAreaStart = GetIngredientValueAreaStart(currentX, ImGui.GetContentRegionMax().X);
         using (ImRaii.PushFont(M3.TitleMedium))
         {
             ImGui.TextUnformatted(M3Navigation.Truncate(title, MathF.Max(8f, valueAreaStart - currentX - M3.Space2)));
@@ -738,17 +739,15 @@ public partial class VulcanWindow
 
             Column("NQ", 0);
             Column("HQ", 1);
-            if (showRetainer)
-            {
-                Column("雇员", 2);
-            }
+            Column("雇员", 2);
+            M3Tooltip.Hovered(VulcanRetainerPreview.InventoryTooltip);
         }
 
         ImGui.SetCursorPos(new Vector2(currentX, bottom + M3.Space1));
         ImGui.Dummy(Vector2.Zero);
     }
 
-    private static void DrawIngredientRow(uint itemId, int needed, Item item, bool showRetainer)
+    private static void DrawIngredientRow(uint itemId, int needed, Item item, VulcanRetainerInventory? retainers)
     {
         var s = M3.Scheme;
         var colWidth = VulcanUiScaling.Scaled(IngredientColumnWidth);
@@ -757,7 +756,7 @@ public partial class VulcanWindow
         var currentX = ImGui.GetCursorPosX();
         var rowY = ImGui.GetCursorPosY();
         var textY = rowY + (iconSize - ImGui.GetTextLineHeight()) * 0.5f;
-        var valueAreaStart = GetIngredientValueAreaStart(currentX, ImGui.GetContentRegionMax().X, showRetainer);
+        var valueAreaStart = GetIngredientValueAreaStart(currentX, ImGui.GetContentRegionMax().X);
 
         var countText = $"×{needed}";
         ImGui.SetCursorPos(new Vector2(currentX + countWidth - ImGui.CalcTextSize(countText).X, textY));
@@ -780,28 +779,25 @@ public partial class VulcanWindow
         var (nq, hq) = GetInventoryCountSplit(itemId);
         DrawIngredientValue(nq, valueAreaStart, colWidth, 0, textY, nq + hq >= needed ? s.Success : s.Error);
         DrawIngredientValue(hq, valueAreaStart, colWidth, 1, textY, s.Info);
-        if (showRetainer)
-        {
-            DrawIngredientValue(GetRetainerItemCount(itemId), valueAreaStart, colWidth, 2, textY, s.Tertiary);
-        }
+        DrawIngredientValue(retainers?.GetTotalCount(itemId), valueAreaStart, colWidth, 2, textY, s.Tertiary);
 
         ImGui.SetCursorPos(new Vector2(currentX, rowY + iconSize + ImGui.GetStyle().ItemSpacing.Y));
         ImGui.Dummy(Vector2.Zero);
     }
 
-    private static void DrawIngredientValue(int value, float valueAreaStart, float colWidth, int index, float textY, Vector4 color)
+    private static void DrawIngredientValue(int? value, float valueAreaStart, float colWidth, int index, float textY, Vector4 color)
     {
-        var text = value > 9999 ? "9999+" : value.ToString();
+        var text = value > 9999 ? "9999+" : value?.ToString() ?? "—";
         ImGui.SetCursorPos(new Vector2(valueAreaStart + colWidth * index + (colWidth - ImGui.CalcTextSize(text).X) * 0.5f, textY));
-        Ui.Text(text, value == 0 ? M3Text.ColorOf(M3TextStyle.Faint) : color);
+        Ui.Text(text, value is null or 0 ? M3Text.ColorOf(M3TextStyle.Faint) : color);
     }
 
-    private static float GetIngredientValueAreaStart(float currentX, float contentMaxX, bool showRetainer)
+    private static float GetIngredientValueAreaStart(float currentX, float contentMaxX)
     {
         var colWidth = VulcanUiScaling.Scaled(IngredientColumnWidth);
         var countWidth = VulcanUiScaling.Scaled(36f);
         var iconSize = VulcanUiScaling.Scaled(24f);
-        var desiredStart = contentMaxX - colWidth * (showRetainer ? 3 : 2);
+        var desiredStart = contentMaxX - colWidth * 3;
         var minimumStart = currentX + countWidth + iconSize + M3.Space2 * 3;
         return Math.Max(desiredStart, minimumStart);
     }
@@ -823,23 +819,4 @@ public partial class VulcanWindow
         catch { return (0, 0); }
     }
 
-    private static int GetRetainerItemCount(uint itemId)
-    {
-        if (!AllaganTools.Enabled)
-        {
-            return 0;
-        }
-
-        var now = DateTime.Now;
-        if (RetainerIngredientRefreshTimes.TryGetValue(itemId, out var lastRefresh)
-         && (now - lastRefresh).TotalSeconds < RetainerIngredientRefreshIntervalSeconds)
-        {
-            return CachedRetainerIngredientCounts.GetValueOrDefault(itemId, 0);
-        }
-
-        var count = RetainerItemQuery.GetTotalCount(itemId);
-        CachedRetainerIngredientCounts[itemId] = count;
-        RetainerIngredientRefreshTimes[itemId] = now;
-        return count;
-    }
 }
