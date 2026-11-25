@@ -15,8 +15,10 @@ internal sealed class CraftingStockRun
     public bool Paused { get; set; }
     public VulcanRetainerInventory? RetainerInventory { get; init; }
     public bool NeedsAdditionalBaseline { get; private set; }
+    public bool IsRecipeBrowserOrder { get; init; }
+    public RecipeBrowserOrder? BrowserOrder { get; set; }
 
-    public static CraftingStockRun Create(CraftingListDefinition list, ulong characterId, bool additionalCrafts)
+    public static CraftingStockRun Create(CraftingListDefinition list, ulong characterId, bool additionalCrafts, bool recipeBrowser = false)
     {
         var snapshot = list.CreateRetainerPlanningSnapshot();
         snapshot.SkipIfEnough = true;
@@ -46,7 +48,26 @@ internal sealed class CraftingStockRun
             AllowCollectableTurnIn = !additionalCrafts,
             RetainerInventory = snapshot.RetainerRestock ? new VulcanRetainerInventory() : null,
             NeedsAdditionalBaseline = additionalCrafts && snapshot.RetainerRestock,
+            IsRecipeBrowserOrder = recipeBrowser,
         };
+    }
+
+    public static CraftingStockRun Restore(RecipeBrowserOrder order)
+        => new()
+        {
+            CharacterId = order.CharacterId,
+            List = order.CreateList(),
+            ItemTargets = new Dictionary<uint, int> { [order.RecipeId] = order.TargetCount },
+            RetainerInventory = order.RetainerRestock ? new VulcanRetainerInventory() : null,
+            IsRecipeBrowserOrder = true,
+            BrowserOrder = order,
+        };
+
+    public RecipeBrowserOrder CreateBrowserOrder(uint itemId)
+    {
+        var item = List.Recipes[0];
+        return new RecipeBrowserOrder(Guid.NewGuid(), CharacterId, item.RecipeId, itemId, List.Name,
+            item.Quantity, ItemTargets[item.RecipeId], item.Options.NQOnly, List.RetainerRestock, item.CraftSettings);
     }
 
     public void SetAdditionalBaseline()

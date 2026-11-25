@@ -483,7 +483,7 @@ public partial class VulcanWindow
         return CraftingContextResolver.UsesRaphaelSolver(executionContext);
     }
 
-    private void DrawDetailsPanel()
+    private void DrawDetailsPanel(RecipeBrowserOrderState pending)
     {
         if (_selectedRecipe == null)
         {
@@ -526,7 +526,7 @@ public partial class VulcanWindow
 
         ImGui.Dummy(new Vector2(0, M3.Space2));
         var settings = GatherBuddy.RecipeBrowserSettings.Get(r.RowId);
-        DrawRecipeActions(recipe, settings);
+        DrawRecipeActions(recipe, settings, pending);
 
         var directIngredients = RecipeManager.GetIngredients(r);
         var craftable = directIngredients.Count > 0 ? int.MaxValue : 0;
@@ -655,14 +655,21 @@ public partial class VulcanWindow
         M3Badge.Draw(label, accent);
     }
 
-    private void DrawRecipeActions(ExtendedRecipe recipe, RecipeCraftSettings? settings)
+    private void DrawRecipeActions(ExtendedRecipe recipe, RecipeCraftSettings? settings, RecipeBrowserOrderState pending)
     {
         using var card = M3Card.Begin("##recipeActions", "制作", FontAwesomeIcon.Hammer, M3.AccentFor(0));
+        if (pending.Order?.RecipeId == recipe.Recipe.RowId)
+        {
+            DrawRecipeBrowserRecovery(pending);
+            return;
+        }
+
         M3Widgets.RowNumber("数量###Quantity##browserQty", ref _browserCraftQuantity, 1, 1, 9999);
         M3Widgets.RowSwitch("考虑雇员库存并取回材料###Restock from retainers##browserRestock", ref _browserRetainerRestock,
             "制作前核实游戏内雇员库存并取回缺少的材料。");
 
-        var blocker = IPCSubscriber.IsReady("Artisan") ? ArtisanLoadedTooltip : null;
+        var blocker = pending.Order != null || pending.ReadFailed ? "请先处理上次制作。"
+            : IPCSubscriber.IsReady("Artisan") ? ArtisanLoadedTooltip : null;
         if (M3Widgets.Button("##startCraft", "开始制作", M3ButtonStyle.Filled, FontAwesomeIcon.Play, enabled: blocker == null,
                 tooltip: blocker ?? $"制作 {recipe.Name} ×{_browserCraftQuantity}")
             && StartBrowserCraft(recipe.Recipe, _browserCraftQuantity))
@@ -685,6 +692,44 @@ public partial class VulcanWindow
         {
             _craftSettingsPopup.Open(recipe.Recipe.RowId, recipe.Name);
         }
+    }
+
+    private void DrawRecipeBrowserRecovery(RecipeBrowserOrderState pending)
+    {
+        var order = pending.Order;
+        if (order != null)
+        {
+            var mode = order.QuickSynth ? "简易制作" : "制作";
+            M3Text.Draw($"上次{mode} · {order.Name} · 目标持有 {order.TargetCount} 个", M3TextStyle.Body, true);
+            var artisanLoaded = IPCSubscriber.IsReady("Artisan");
+            if (M3Widgets.Button("##resumeRecipeOrder", "继续上次制作", M3ButtonStyle.Filled, FontAwesomeIcon.Play,
+                    enabled: !artisanLoaded, tooltip: artisanLoaded ? ArtisanLoadedTooltip : "按当前库存计算上次任务的缺口。")
+                && CraftingGatherBridge.ResumeRecipeBrowserCraft(order))
+            {
+                MinimizeWindow();
+            }
+
+            ImGui.SameLine(0, M3.Space2);
+        }
+        else
+        {
+            M3Text.Draw("无法读取上次制作的恢复记录。", M3TextStyle.Warning, true);
+            if (M3Widgets.Button("##reloadRecipeOrder", "重新读取", M3ButtonStyle.Tonal, FontAwesomeIcon.Sync))
+            {
+                CraftingGatherBridge.GetPendingRecipeBrowserOrder(refresh: true);
+            }
+
+            ImGui.SameLine(0, M3.Space2);
+        }
+
+        var discardId = order != null ? $"##discardRecipeOrder{order.Id:N}" : $"##discardRecipeOrder{pending.CharacterId}";
+        if (M3Widgets.HoldButton(discardId, "放弃上次制作", 0.6f, M3ButtonStyle.Danger, FontAwesomeIcon.Trash,
+                tooltip: "长按清除恢复记录。下次开始时将按新的追加数量计算。"))
+        {
+            CraftingGatherBridge.DiscardPendingRecipeBrowserOrder(pending);
+        }
+
+        ImGui.Dummy(new Vector2(0f, M3.Space1));
     }
 
     private static Vector4 GetRaphaelAssessmentColor(RaphaelAssessment assessment)

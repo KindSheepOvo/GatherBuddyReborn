@@ -1,5 +1,6 @@
 ﻿using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Utility;
+using GatherBuddy.Crafting;
 using Lumina.Excel.Sheets;
 using RebornMaterial;
 using System;
@@ -458,6 +459,12 @@ public partial class VulcanWindow
 
             UpdateFilteredList();
 
+            var pending = CraftingGatherBridge.GetPendingRecipeBrowserOrder();
+            if (pending.ReadFailed || pending.Order != null && _selectedRecipe?.Recipe.RowId != pending.Order.RecipeId)
+            {
+                DrawRecipeBrowserRecovery(pending);
+            }
+
             var avail = ImGui.GetContentRegionAvail();
             using (var panel = M3Panel.Begin("##FilterPanel", new Vector2(VulcanUiScaling.Scaled(230f), avail.Y), true, VulcanUiStyle.PanelBackground))
             {
@@ -481,7 +488,7 @@ public partial class VulcanWindow
             {
                 if (panel)
                 {
-                    DrawDetailsPanel();
+                    DrawDetailsPanel(pending);
                 }
             }
         }

@@ -90,7 +90,7 @@ public class CraftingStatusWindow : M3Window
 
     public override void Draw()
     {
-        const string stopTooltip = "停止制作队列。";
+        var stopTooltip = CraftingGatherBridge.IsRecipeBrowserStockRun ? "停止并放弃本次追加制作。" : "停止制作队列。";
         if (CraftingGatherBridge.StockStatus is { } status)
         {
             ReportFocus();

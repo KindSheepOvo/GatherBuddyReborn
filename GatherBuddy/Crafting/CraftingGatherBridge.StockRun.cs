@@ -28,6 +28,7 @@ public static partial class CraftingGatherBridge
 
     internal static string? StockStatus { get; private set; }
     internal static bool StockRunPaused => _stockRun?.Paused == true;
+    internal static bool IsRecipeBrowserStockRun => _stockRun?.IsRecipeBrowserOrder == true;
     internal static bool IsGatheringForStockRun => _stockRun != null && _gatherList != null;
 
     internal static bool HoldQueueForStockPlan(CraftingQueueProcessor processor)
@@ -78,29 +79,39 @@ public static partial class CraftingGatherBridge
 
     internal static bool StartRecipeBrowserCraft(uint recipeId, string name, int quantity, bool quickSynth,
         bool retainerRestock, RecipeCraftSettings? settings)
+        => TryStartStockRun(RecipeBrowserOrder.CreateList(recipeId, name, quantity, quickSynth, retainerRestock, settings),
+            additionalCrafts: true, recipeBrowser: true);
+
+    internal static bool ResumeRecipeBrowserCraft(RecipeBrowserOrder order)
+        => TryStartStockRun(order.CreateList(), additionalCrafts: true, recipeBrowser: true, expectedOrder: order);
+
+    internal static RecipeBrowserOrderState GetPendingRecipeBrowserOrder(bool refresh = false)
     {
-        var list = new CraftingListDefinition
+        var characterId = GetStockCharacterId();
+        return characterId != 0 && _stockRun == null && _queueProcessor == null
+            ? RecipeBrowserOrderStore.Get(characterId, refresh)
+            : default;
+    }
+
+    internal static void DiscardPendingRecipeBrowserOrder(RecipeBrowserOrderState pending)
+    {
+        var characterId = GetStockCharacterId();
+        if (characterId == 0 || characterId != pending.CharacterId || _stockRun != null || _queueProcessor != null)
         {
-            ID = -1,
-            Name = name,
-            RetainerRestock = retainerRestock,
-            Recipes =
-            [
-                new CraftingListItem(recipeId, quantity)
-                {
-                    IsOriginalRecipe = true,
-                    CraftSettings = settings?.Clone(),
-                    Options = new ListItemOptions { NQOnly = quickSynth },
-                },
-            ],
-        };
-        return TryStartStockRun(list, additionalCrafts: true);
+            return;
+        }
+
+        if (!RecipeBrowserOrderStore.TryRemove(characterId, pending.Order?.Id))
+        {
+            Communicator.Print("[Vulcan] 无法放弃上次制作。请检查恢复记录是否已更改或插件目录权限。");
+        }
     }
 
     private static ulong GetStockCharacterId()
         => Dalamud.ClientState.IsLoggedIn && Dalamud.PlayerState.IsLoaded ? Dalamud.PlayerState.ContentId : 0;
 
-    private static bool TryStartStockRun(CraftingListDefinition list, bool additionalCrafts)
+    private static bool TryStartStockRun(CraftingListDefinition list, bool additionalCrafts, bool recipeBrowser = false,
+        RecipeBrowserOrder? expectedOrder = null)
     {
         var characterId = GetStockCharacterId();
         if (characterId == 0)
@@ -111,8 +122,8 @@ public static partial class CraftingGatherBridge
 
         if (_stockRun is { } activeRun && activeRun.CharacterId == characterId
             && (list.ID >= 0 && list.ID == activeRun.List.ID
-                || list.ID < 0 && activeRun.List.ID < 0 && list.Recipes is [var recipe]
-                    && activeRun.List.Recipes is [var activeRecipe] && recipe.RecipeId == activeRecipe.RecipeId))
+                || recipeBrowser && activeRun.IsRecipeBrowserOrder && list.Recipes[0].RecipeId == activeRun.List.Recipes[0].RecipeId
+                    && (expectedOrder == null || activeRun.BrowserOrder?.Id == expectedOrder.Id)))
         {
             ReplanStockRun(activeRun);
             GatherBuddy.CraftingStatusWindow?.OpenOrRestore();
@@ -126,13 +137,50 @@ public static partial class CraftingGatherBridge
             return false;
         }
 
+        if (recipeBrowser)
+        {
+            var pending = RecipeBrowserOrderStore.Get(characterId, refresh: true);
+            if (pending.ReadFailed)
+            {
+                Communicator.Print("[Vulcan] 无法读取上次制作的恢复记录。请在配方页处理该记录。");
+                return false;
+            }
+
+            if (expectedOrder != null && (expectedOrder.CharacterId != characterId || pending.Order?.Id != expectedOrder.Id))
+            {
+                Communicator.Print("[Vulcan] 上次制作的恢复记录已变更。");
+                return false;
+            }
+
+            if (pending.Order is { } order)
+            {
+                if (list.Recipes[0].RecipeId != order.RecipeId)
+                {
+                    Communicator.Print("[Vulcan] 此角色还有未完成的配方制作。请先继续或放弃上次的任务。");
+                    return false;
+                }
+
+                if (RecipeManager.GetRecipe(order.RecipeId) is not { AmountResult: > 0 } recipe
+                    || recipe.ItemResult.RowId != order.ItemId || order.QuickSynth && !recipe.CanQuickSynth)
+                {
+                    Communicator.Print("[Vulcan] 上次配方或制作方式已变更。请放弃该任务后重新选择配方。");
+                    return false;
+                }
+
+                var restored = CraftingStockRun.Restore(order);
+                ActivateStockRun(restored);
+                ReplanStockRun(restored);
+                return true;
+            }
+        }
+
         if (additionalCrafts && !CraftingStockRun.IsInventoryReady())
         {
             Communicator.Print("[Vulcan] 等待角色背包加载后再开始制作。");
             return false;
         }
 
-        var run = CraftingStockRun.Create(list, characterId, additionalCrafts);
+        var run = CraftingStockRun.Create(list, characterId, additionalCrafts, recipeBrowser);
         if (run.ItemTargets.Count == 0)
         {
             return false;
@@ -348,6 +396,12 @@ public static partial class CraftingGatherBridge
             return;
         }
 
+        if (run.IsRecipeBrowserOrder && !characterLoaded)
+        {
+            ScheduleStockWork(ReadinessRetryDelay);
+            return;
+        }
+
         if (_retainerVerification is { } verification)
         {
             if (verification.Tick() == CraftingTasks.TaskResult.Retry)
@@ -458,6 +512,25 @@ public static partial class CraftingGatherBridge
         }
 
         run.SetAdditionalBaseline();
+        if (run.IsRecipeBrowserOrder && run.BrowserOrder == null)
+        {
+            var recipe = RecipeManager.GetRecipe(run.List.Recipes[0].RecipeId);
+            if (recipe is not { AmountResult: > 0 } currentRecipe)
+            {
+                PauseStockRun("无法读取配方产物，追加制作已暂停。");
+                return;
+            }
+
+            var order = run.CreateBrowserOrder(currentRecipe.ItemResult.RowId);
+            if (!RecipeBrowserOrderStore.TryCreate(order))
+            {
+                PauseStockRun("无法保存追加制作目标。请检查插件目录权限，或停止当前任务后继续已保存的任务。");
+                return;
+            }
+
+            run.BrowserOrder = order;
+        }
+
         _stockPlanDirty = false;
         var next = CraftingExecutionPlan.CreateForRun(run);
         if (next.ResolvedPlan.Recipes.Count == 0 && next.RetainerConsumedCraftables.Count == 0)
@@ -620,6 +693,11 @@ public static partial class CraftingGatherBridge
         }
 
         ReleaseStockRuntime();
+        if (run.BrowserOrder is { } order && !RecipeBrowserOrderStore.TryRemove(order.CharacterId, order.Id))
+        {
+            Communicator.Print("[Vulcan] 无法清除追加制作的恢复记录。请在配方页检查该任务。");
+        }
+
         if (completed)
         {
             GatherBuddy.Log.Information($"[Vulcan] 制作清单「{run.List.Name}」的目标已完成。");
@@ -686,6 +764,7 @@ public static partial class CraftingGatherBridge
     internal static void Dispose()
     {
         ReleaseStockRuntime();
+        RecipeBrowserOrderStore.ClearCache();
         VulcanRetainerPreview.Dispose();
     }
 }
