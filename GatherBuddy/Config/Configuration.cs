@@ -10,6 +10,7 @@ using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace GatherBuddy.Config;
@@ -178,6 +179,7 @@ public partial class Configuration : IPluginConfiguration
 
     [JsonIgnore] private bool _savePending = false;
     [JsonIgnore] private long _lastMarkTick = 0;
+    [JsonIgnore] private readonly Lock _saveLock = new();
 
     public void Save()
     {
@@ -200,11 +202,19 @@ public partial class Configuration : IPluginConfiguration
         _savePending = false;
         if (force)
         {
-            Dalamud.PluginInterface.SavePluginConfig(this);
+            WriteConfig();
         }
         else
         {
-            Task.Run(() => Dalamud.PluginInterface.SavePluginConfig(this));
+            Task.Run(WriteConfig);
+        }
+    }
+
+    private void WriteConfig()
+    {
+        lock (_saveLock)
+        {
+            Dalamud.PluginInterface.SavePluginConfig(this);
         }
     }
 

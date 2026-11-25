@@ -6,7 +6,7 @@ namespace GatherBuddy.Crafting;
 
 internal sealed class CraftingStockRun
 {
-    private Dictionary<uint, int>? _stockBeforeTurnIn;
+    private bool _turnInProgressNeedsSave;
 
     public ulong CharacterId { get; init; }
     public CraftingListDefinition List { get; init; } = new();
@@ -89,44 +89,43 @@ internal sealed class CraftingStockRun
         NeedsAdditionalBaseline = false;
     }
 
-    public void CaptureCollectableStock()
+    public void RecordTurnedInCollectable(uint itemId)
     {
-        var counts = new Dictionary<uint, int>();
         foreach (var (recipeId, target) in ItemTargets)
         {
-            if (target > 0 && RecipeManager.GetRecipe(recipeId) is { } recipe && recipe.ItemResult.Value.AlwaysCollectable
-                && !counts.ContainsKey(recipe.ItemResult.RowId))
+            if (target <= 0 || RecipeManager.GetRecipe(recipeId) is not { AmountResult: 1 } recipe
+                || recipe.ItemResult.RowId != itemId || !recipe.ItemResult.Value.AlwaysCollectable)
             {
-                counts.Add(recipe.ItemResult.RowId, GetInventoryCount(recipe.ItemResult.RowId));
+                continue;
             }
-        }
 
-        _stockBeforeTurnIn = counts;
-    }
+            ItemTargets[recipeId] = target - 1;
+            var plannedItem = List.Recipes.Find(item => item.RecipeId == recipeId);
+            if (plannedItem != null)
+            {
+                plannedItem.Quantity = target - 1;
+            }
 
-    public void AccountForTurnedInCollectables()
-    {
-        if (_stockBeforeTurnIn is not { Count: > 0 } counts || !IsInventoryReady())
-        {
+            var savedItem = GatherBuddy.CraftingListManager.GetListByID(List.ID)?.Recipes.Find(item => item.RecipeId == recipeId);
+            if (savedItem is { Quantity: > 0 })
+            {
+                savedItem.Quantity--;
+                _turnInProgressNeedsSave = true;
+            }
+
             return;
         }
+    }
 
-        _stockBeforeTurnIn = null;
-        foreach (var (itemId, previousCount) in counts)
+    public bool TrySaveTurnInProgress()
+    {
+        if (_turnInProgressNeedsSave && !GatherBuddy.CraftingListManager.SaveTurnInProgress())
         {
-            counts[itemId] = Math.Max(0, previousCount - GetInventoryCount(itemId));
+            return false;
         }
 
-        // A hand-in reduces the outstanding target even though the item has left the bag.
-        foreach (var (recipeId, target) in ItemTargets)
-        {
-            if (target > 0 && RecipeManager.GetRecipe(recipeId) is { } recipe && counts.TryGetValue(recipe.ItemResult.RowId, out var removed))
-            {
-                var credited = Math.Min(removed, target);
-                counts[recipe.ItemResult.RowId] -= credited;
-                ItemTargets[recipeId] = target - credited;
-            }
-        }
+        _turnInProgressNeedsSave = false;
+        return true;
     }
 
     internal static int GetInventoryCount(uint itemId)

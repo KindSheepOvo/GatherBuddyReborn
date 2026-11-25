@@ -1,3 +1,6 @@
+using Dalamud.Game.ClientState.Conditions;
+using Dalamud.Game.Inventory;
+using Dalamud.Game.Inventory.InventoryEventArgTypes;
 using Dalamud.Plugin.Services;
 using GatherBuddy.Automation;
 using GatherBuddy.Config;
@@ -46,6 +49,7 @@ public unsafe class CollectableManager : IDisposable
     public event Action? OnFinishCollecting;
     public event Action<string>? OnError;
     internal event Action? VulcanTurnInStopped;
+    internal event Action<uint>? VulcanItemTurnedIn;
 
     public bool IsRunning { get; private set; }
     public string StatusText { get; private set; } = "空闲";
@@ -58,6 +62,7 @@ public unsafe class CollectableManager : IDisposable
     private VendorNpcLocation? _turnInLocation;
     private Guid? _activePurchaseListId;
     private uint _currentItemId;
+    private uint _awaitingVulcanItemId;
     private int _currentJobId = -1;
     private DateTime _lastAction = DateTime.MinValue;
     private DateTime _stateStartTime = DateTime.MinValue;
@@ -148,6 +153,11 @@ public unsafe class CollectableManager : IDisposable
         StatusText = $"开始收藏品交付（{DescribeSource(source)}），地点：{route.DisplayName}。";
 
         GatherBuddy.Log.Information($"[收藏品管理器] 开始收藏品交付（{DescribeSource(source)}），使用 {route.DisplayName}");
+        if (source == CollectableRunSource.VulcanQueue)
+        {
+            Dalamud.GameInventory.InventoryChanged += OnVulcanInventoryChanged;
+        }
+
         _framework.Update += OnUpdate;
         return true;
     }
@@ -418,17 +428,63 @@ public unsafe class CollectableManager : IDisposable
 
         var next = _turnInQueue.Peek();
         StatusText = $"正在交付 {next.ItemName}。";
-        _windowHandler.SubmitItem();
         _lastAction = DateTime.UtcNow;
         _stateStartTime = DateTime.UtcNow;
         _state = CollectableState.CheckingOvercapDialog;
+        _awaitingVulcanItemId = CurrentRunSource == CollectableRunSource.VulcanQueue ? next.ItemId : 0;
+        if (!_windowHandler.TrySubmitItem() && _awaitingVulcanItemId != 0)
+        {
+            _awaitingVulcanItemId = 0;
+            Fail($"收藏品交易窗口尚未就绪，无法交纳 {next.ItemName}。");
+        }
     }
 
+    private void OnVulcanInventoryChanged(IReadOnlyCollection<InventoryEventArgs> changes)
+    {
+        var itemId = _awaitingVulcanItemId;
+        if (itemId == 0 || !Dalamud.ClientState.IsLoggedIn || _condition[ConditionFlag.BetweenAreas] || _condition[ConditionFlag.BetweenAreas51])
+        {
+            return;
+        }
+
+        var removed = 0L;
+        foreach (var change in changes)
+        {
+            var currentCount = CountPendingCollectable(change.Item, itemId);
+            removed += change switch
+            {
+                InventoryItemRemovedArgs => currentCount,
+                InventoryItemAddedArgs => -currentCount,
+                InventoryItemChangedArgs changed => CountPendingCollectable(changed.OldItemState, itemId) - currentCount,
+                _ => 0,
+            };
+        }
+
+        if (removed > 0)
+        {
+            _awaitingVulcanItemId = 0;
+            VulcanItemTurnedIn?.Invoke(itemId);
+        }
+    }
+
+    private static long CountPendingCollectable(GameInventoryItem item, uint itemId)
+        => item.ContainerType is >= GameInventoryType.Inventory1 and <= GameInventoryType.Inventory4
+            && item.IsCollectable && item.BaseItemId == itemId ? item.Quantity : 0;
+
     private void CheckOvercapDialog()
+    {
+        if (!TryHandleOvercapDialog() && DateTime.UtcNow - _stateStartTime > TimeSpan.FromMilliseconds(500))
+        {
+            _state = CollectableState.WaitingForSubmit;
+        }
+    }
+
+    private bool TryHandleOvercapDialog()
     {
         if (GenericHelpers.TryGetAddonByName<FFXIVClientStructs.FFXIV.Client.UI.AddonSelectYesno>("SelectYesno", out var addon)
          && GenericHelpers.IsAddonReady((FFXIVClientStructs.FFXIV.Component.GUI.AtkUnitBase*)addon))
         {
+            _awaitingVulcanItemId = 0;
             Callback.Fire((FFXIVClientStructs.FFXIV.Component.GUI.AtkUnitBase*)addon, true, 1);
             _lastAction = DateTime.UtcNow;
             _currentItemId = 0;
@@ -440,23 +496,20 @@ public unsafe class CollectableManager : IDisposable
                 DisableAutoTurnInAndFail(_lastOvercapPurchaseHitScripReserveLimit
                     ? "运行购买列表后收藏品仍被工票上限阻止。配置的工票储备阻止了足够的工票消费以继续。"
                     : "运行购买列表后收藏品仍被工票上限阻止。");
-                return;
+                return true;
             }
 
             if (!HasConfiguredPurchaseList())
             {
                 DisableAutoTurnInAndFail("收藏品交付时达到工票上限，但未配置收藏品购买列表。");
-                return;
+                return true;
             }
 
             TransitionAfterClosingTurnInWindow(CollectableState.StartingPurchaseList, "已达到工票上限，正在运行收藏品购买列表。");
-            return;
+            return true;
         }
 
-        if (DateTime.UtcNow - _stateStartTime > TimeSpan.FromMilliseconds(500))
-        {
-            _state = CollectableState.WaitingForSubmit;
-        }
+        return false;
     }
 
     private void WaitForSubmit()
@@ -469,6 +522,16 @@ public unsafe class CollectableManager : IDisposable
         if (_turnInQueue.Count == 0)
         {
             BeginCompletionFlow();
+            return;
+        }
+
+        if (_awaitingVulcanItemId != 0)
+        {
+            if (DateTime.UtcNow - _stateStartTime > TimeSpan.FromSeconds(5) && !TryHandleOvercapDialog())
+            {
+                Fail($"游戏未确认交纳 {_turnInQueue.Peek().ItemName}，请检查收藏品交易窗口。");
+            }
+
             return;
         }
 
@@ -809,6 +872,12 @@ public unsafe class CollectableManager : IDisposable
     private void CleanupCurrentRun(bool stopActivePurchaseList)
     {
         _framework.Update -= OnUpdate;
+        if (CurrentRunSource == CollectableRunSource.VulcanQueue)
+        {
+            Dalamud.GameInventory.InventoryChanged -= OnVulcanInventoryChanged;
+        }
+
+        _awaitingVulcanItemId = 0;
         if (_turnInVendor != null)
         {
             VendorInteractionHelper.ResetShopSelectionState(_turnInVendor);

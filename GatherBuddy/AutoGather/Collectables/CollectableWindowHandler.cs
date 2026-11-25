@@ -52,7 +52,7 @@ public unsafe class CollectableWindowHandler
         SelectItem(itemName);
     }
 
-    public unsafe void SubmitItem()
+    public unsafe bool TrySubmitItem()
     {
         if (Automation.GenericHelpers.TryGetAddonByName<AtkUnitBase>("CollectablesShop", out var addon) &&
             Automation.GenericHelpers.IsAddonReady(addon))
@@ -63,7 +63,10 @@ public unsafe class CollectableWindowHandler
                 new(){Type = ValueType.UInt, UInt = 0}
             };
             addon->FireCallback(2, submitItem, true);
+            return true;
         }
+
+        return false;
     }
 
     public unsafe void CloseWindow()

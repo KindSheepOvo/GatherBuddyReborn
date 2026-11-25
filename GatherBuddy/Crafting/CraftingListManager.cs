@@ -408,7 +408,10 @@ public class CraftingListManager
             ? "Root"
             : NormalizeFolderPath(folderPath).Replace("/", " / ");
 
-    private void Save()
+    internal bool SaveTurnInProgress()
+        => Save(flush: true);
+
+    private bool Save(bool flush = false)
     {
         try
         {
@@ -429,11 +432,18 @@ public class CraftingListManager
             GatherBuddy.Config.CraftingFolders = GetKnownFolderPaths();
             GatherBuddy.Config.CraftingLists = JsonConvert.SerializeObject(_lists);
             GatherBuddy.Config.Save();
+            if (flush)
+            {
+                GatherBuddy.Config.SaveIfDirty(force: true);
+            }
+
             GatherBuddy.Log.Debug($"[CraftingListManager] Saved {_lists.Count} crafting lists");
+            return true;
         }
         catch (Exception ex)
         {
             GatherBuddy.Log.Error($"[CraftingListManager] Error saving lists: {ex.Message}");
+            return false;
         }
     }
 

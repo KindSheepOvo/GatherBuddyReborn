@@ -18,6 +18,7 @@ public static partial class CraftingGatherBridge
     private static bool _collectablesCheckPending;
     private static readonly TimeSpan InventorySettleDelay = TimeSpan.FromMilliseconds(200);
     private static readonly TimeSpan ReadinessRetryDelay = TimeSpan.FromMilliseconds(750);
+    private const string TurnInSaveFailure = "无法保存收藏品交纳后的清单数量。点击「继续」重试保存。";
     private static RetainerTaskExecutor? _retainerVerification;
     private static bool _refreshRetainerInventory;
     private static CancellationTokenSource? _stockRunCancellation;
@@ -72,6 +73,7 @@ public static partial class CraftingGatherBridge
         CraftingGameInterop.StateChanged += OnCraftStateChanged;
         GatherBuddy.AutoGather.EnabledChanged += OnGatherEnabledChanged;
         GatherBuddy.CollectableManager.VulcanTurnInStopped += OnStockTurnInStopped;
+        GatherBuddy.CollectableManager.VulcanItemTurnedIn += OnStockItemTurnedIn;
     }
 
     public static void StartQueueCraftAndGather(CraftingListDefinition list, bool additionalCrafts = false)
@@ -269,6 +271,21 @@ public static partial class CraftingGatherBridge
     private static bool IsBagInventory(GameInventoryType inventory)
         => inventory is >= GameInventoryType.Inventory1 and <= GameInventoryType.Inventory4;
 
+    private static void OnStockItemTurnedIn(uint itemId)
+    {
+        if (!_waitingForCollectables || _stockRun is not { } run || !StockTargetItems.Contains(itemId))
+        {
+            return;
+        }
+
+        run.RecordTurnedInCollectable(itemId);
+        if (!run.TrySaveTurnInProgress())
+        {
+            GatherBuddy.CollectableManager.Stop();
+            PauseStockRun(TurnInSaveFailure);
+        }
+    }
+
     private static void MarkStockPlanDirty()
     {
         if (_stockRun != null)
@@ -423,6 +440,12 @@ public static partial class CraftingGatherBridge
             return;
         }
 
+        if (!run.TrySaveTurnInProgress())
+        {
+            PauseStockRun(TurnInSaveFailure);
+            return;
+        }
+
         if (_waitingForCollectablesHomeReturn)
         {
             ContinueCollectablesHomeReturn(run);
@@ -488,7 +511,6 @@ public static partial class CraftingGatherBridge
             return;
         }
 
-        run.AccountForTurnedInCollectables();
         if (TryBeginStockTurnIn(run) || !_stockPlanDirty)
         {
             return;
@@ -720,11 +742,12 @@ public static partial class CraftingGatherBridge
 
     private static void ReleaseStockRuntime()
     {
-        if (_stockRun == null)
+        if (_stockRun is not { } run)
         {
             return;
         }
 
+        run.TrySaveTurnInProgress();
         _stockRun = null;
         _stockRunCancellation?.Cancel();
         _stockRunCancellation?.Dispose();
@@ -736,6 +759,7 @@ public static partial class CraftingGatherBridge
         CraftingGameInterop.StateChanged -= OnCraftStateChanged;
         GatherBuddy.AutoGather.EnabledChanged -= OnGatherEnabledChanged;
         GatherBuddy.CollectableManager.VulcanTurnInStopped -= OnStockTurnInStopped;
+        GatherBuddy.CollectableManager.VulcanItemTurnedIn -= OnStockItemTurnedIn;
         if (GatherBuddy.CollectableManager is { IsRunning: true, CurrentRunSource: CollectableRunSource.VulcanQueue })
         {
             GatherBuddy.CollectableManager.Stop();

@@ -166,7 +166,8 @@ public sealed class CollectablesWindow : M3PanelWindow
         var turnInsAvailable = CollectableTurnInRequirements.IsAvailable;
         var previousHardFailReason = config.AutoTurnInHardFailReason;
         SettingRows.PluginSwitch("自动缴纳收藏品",
-            turnInsAvailable ? "允许自动采集和 Vulcan 制作队列自动触发收藏品缴纳。" : CollectableTurnInRequirements.UnavailableHelpText,
+            turnInsAvailable ? "允许自动采集和 Vulcan 制作队列自动触发收藏品缴纳。Vulcan 每成功缴纳一件，会扣减并保存当前制作清单中对应的产物数量。"
+                : CollectableTurnInRequirements.UnavailableHelpText,
             config.AutoTurnInCollectables, v =>
             {
                 config.AutoTurnInCollectables = v;

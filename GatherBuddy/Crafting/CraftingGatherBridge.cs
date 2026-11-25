@@ -507,7 +507,6 @@ public static partial class CraftingGatherBridge
 
         if (manager.Start(CollectableRunSource.VulcanQueue, returnHomeAfterCompletion: true))
         {
-            run.CaptureCollectableStock();
             _collectablesStartPending = false;
             _waitingForCollectables = true;
             _lastCollectablesWaitLog = DateTime.MinValue;
@@ -654,7 +653,6 @@ public static partial class CraftingGatherBridge
 
     private static void ResumeStockAfterCollectables(CraftingStockRun run)
     {
-        run.AccountForTurnedInCollectables();
         ResetCollectablesInterruptionState();
         _collectablesCheckPending = false;
         DiscardStockQueue();
@@ -675,7 +673,6 @@ public static partial class CraftingGatherBridge
         var config = GatherBuddy.Config.CollectableConfig;
         if (!config.AutoTurnInCollectables && !string.IsNullOrWhiteSpace(config.AutoTurnInHardFailReason))
         {
-            run.AccountForTurnedInCollectables();
             _waitingForCollectables = false;
             _waitingForCollectablesHomeReturn = true;
             SetStockStatus("已停止交纳收藏品，正在返回家园");
@@ -717,9 +714,8 @@ public static partial class CraftingGatherBridge
 
     private static void OnStockTurnInStopped()
     {
-        if (_waitingForCollectables && _stockRun is { } run)
+        if (_waitingForCollectables && _stockRun != null)
         {
-            run.AccountForTurnedInCollectables();
             ResetCollectablesInterruptionState();
             PauseStockRun("收藏品交纳已停止。点击「继续」按当前库存重新计算。");
             GatherBuddy.CraftingStatusWindow?.OpenOrRestore();
